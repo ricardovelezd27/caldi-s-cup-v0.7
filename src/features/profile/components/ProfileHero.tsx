@@ -9,22 +9,8 @@ import { Pencil, Check, X, Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/language";
-import { useUserRank } from "@/features/gamification";
-import { Progress } from "@/components/ui/progress";
+import { ProfileRankRow } from "./ProfileRankRow";
 import caldiLogo from "/lovable-uploads/8e78a6bd-5f00-45be-b082-c35b57fa9a7c.png";
-
-/** Compact rank display for mobile profile hero */
-function ProfileRankRow() {
-  const { currentRank, totalXP, progressToNext, nextRank } = useUserRank();
-  return (
-    <div className="flex items-center gap-2 mt-1.5">
-      <span className={`text-base ${currentRank.colorClass}`}>{currentRank.icon}</span>
-      <span className={`text-xs font-semibold ${currentRank.colorClass}`}>{currentRank.name}</span>
-      <Progress value={progressToNext} className="h-1.5 flex-1 max-w-[100px]" />
-      <span className="text-xs text-muted-foreground">{totalXP} XP</span>
-    </div>
-  );
-}
 
 export function ProfileHero() {
   const { user, profile, refreshProfile } = useAuth();

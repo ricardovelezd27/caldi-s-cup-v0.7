@@ -3,7 +3,7 @@ import { Container } from "@/components/shared/Container";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useAuth } from "@/contexts/auth";
 import { useLanguage } from "@/contexts/language";
-import { ProfileAvatar, ProfileHero, ProfileInfoForm, ChangePasswordForm, RetakeQuizSection, TribeSection, FavoritesTable, InventoryTable } from "./components";
+import { ProfileAvatar, ProfileHero, ProfileInfoForm, ProfileRankRow, ChangePasswordForm, RetakeQuizSection, TribeSection, FavoritesTable, InventoryTable } from "./components";
 import { Separator } from "@/components/ui/separator";
 import { FeedbackCTA } from "@/components/shared/FeedbackCTA";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -33,6 +33,7 @@ function ProfileContent() {
                 displayName={profile.display_name}
                 email={user.email}
               />
+              <ProfileRankRow />
               <div>
                 <h2 className="text-xl md:text-2xl mb-3">{t("profile.tribeHeading")}</h2>
                 <TribeSection tribe={profile.coffee_tribe} />

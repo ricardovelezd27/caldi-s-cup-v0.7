@@ -1,53 +1,81 @@
 
 
-# Plan: Fix Gamification XP Not Reflecting on Profile
+# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
 
-## Root Cause Analysis
+## Root Cause
 
-Two distinct bugs prevent XP from showing on the profile:
-
-### Bug 1: Lesson XP never reaches `profiles.total_xp`
-The lesson completion flow in `LessonScreen.tsx` calls `updateStreakViaRPC()`, which updates `learning_user_streaks.total_xp` only. It never calls the global `awardXP()` from `xpService.ts`, which is the function that increments `profiles.total_xp`. The profile page and `useUserRank` hook read from `profiles.total_xp`, so lesson XP is invisible.
-
-### Bug 2: Profile data is stale after earning XP
-After completing a lesson and navigating to `/profile`, `AuthContext.profile` still holds the old cached value. `refreshProfile()` is never called after XP changes.
-
-### Bug 3: Desktop profile shows no XP at all
-The `ProfileRankRow` (rank + XP bar) only renders inside `ProfileHero`, which is mobile-only. Desktop users see no gamification stats.
-
----
-
-## Fix Plan
-
-### 1. Sync lesson XP to `profiles.total_xp` (LessonScreen.tsx)
-After `updateStreakViaRPC` succeeds, call `awardXP(user.id, "complete_lesson", xpCalc.totalXP)` — or more efficiently, add a direct profile update inline to avoid double-logging. Since `updateStreakViaRPC` already logs to the streaks table, the cleanest fix is to add a profile increment after the RPC call:
+Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
 
 ```typescript
-// After streak update, sync XP to profile
-await supabase.from("profiles")
-  .update({ total_xp: streakResult.totalXp })
-  .eq("id", user.id);
+const allText = JSON.stringify(sanitizedData).toLowerCase();
 ```
 
-Wait — that uses the streaks total, not incremental. Better: just increment profiles.total_xp by `xpCalc.totalXP` directly, matching how `awardXP` works but without double-inserting into `user_xp_logs`.
+When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
 
-### 2. Refresh profile after lesson completion (LessonScreen.tsx)
-Call `refreshProfile()` from `useAuth()` at the end of `handleLessonDone`.
+## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
 
-### 3. Add rank display to desktop profile (ProfilePage.tsx)
-Extract `ProfileRankRow` into its own shared component and render it on the desktop left column below the avatar.
+### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
 
----
+Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
 
-## Files Modified
+- `coffeeName`, `brand`
+- `variety`, `processingMethod`
+- `legacyRoastLevel` (text roast descriptor)
+- `originCountry`, `originRegion`, `originFarm`
+- `flavorNotes` (joined)
 
-| File | Change |
-|------|--------|
-| `src/features/learning/components/lesson/LessonScreen.tsx` | Add `profiles.total_xp` increment + call `refreshProfile()` after completion |
-| `src/features/profile/components/ProfileHero.tsx` | Extract `ProfileRankRow` to its own file |
-| `src/features/profile/components/ProfileRankRow.tsx` | **Create** — shared rank display component |
-| `src/features/profile/ProfilePage.tsx` | Render `ProfileRankRow` in desktop left column |
-| `src/features/profile/components/index.ts` | Export `ProfileRankRow` |
+**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
 
-No database changes needed.
+```typescript
+// Build search text from ONLY the coffee's actual attributes
+const attributeText = [
+  sanitizedData.coffeeName,
+  sanitizedData.brand,
+  sanitizedData.variety,
+  sanitizedData.processingMethod,
+  sanitizedData.legacyRoastLevel,
+  sanitizedData.originCountry,
+  sanitizedData.originRegion,
+  sanitizedData.originFarm,
+  ...sanitizedData.flavorNotes,
+].filter(Boolean).join(" ").toLowerCase();
+```
+
+### 2. Strengthen the tribe context in the prompt (line 384-386)
+
+Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
+
+**Before:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+Consider these when calculating the tribe match score.
+```
+
+**After:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
+variety, processing method, roast level, origin, and flavor notes.
+Do NOT let references to other varietals or methods in jargon explanations
+influence the match assessment. For example, if the variety is "Caturra",
+do not count "Bourbon" as a match just because Caturra descends from Bourbon.
+```
+
+### 3. No model change
+
+Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
+
+## Impact
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
+| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
+| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
+
+Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
+
+## Implementation
+
+Single file edit with 2 changes, auto-deploys as edge function.
 
