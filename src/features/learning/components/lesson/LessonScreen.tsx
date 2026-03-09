@@ -194,7 +194,7 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
     );
   }
 
-  // --- EXERCISE + FEEDBACK (immersive) ---
+  // --- EXERCISE + FEEDBACK ---
   if ((lesson.state === "exercise" || lesson.state === "feedback") && lesson.currentExercise) {
     const isFeedback = lesson.state === "feedback";
     const feedbackQd = lesson.currentExercise?.questionData as any;
@@ -202,7 +202,7 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
     const mascot = (lesson.currentExercise?.mascot as "caldi" | "goat") ?? "caldi";
 
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-background">
+      <PageLayout>
         <LessonProgress
           current={lesson.currentIndex + 1}
           total={lesson.exercises.length}
@@ -210,7 +210,7 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
           hearts={user ? hearts : undefined}
           maxHearts={user ? maxHearts : undefined}
         />
-        <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col">
+        <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col px-4 pb-8">
           <ExerciseRenderer
             key={lesson.currentExercise.id}
             exercise={lesson.currentExercise}
@@ -218,20 +218,21 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
             disabled={(!hasHearts && !!user) || isFeedback}
           />
         </div>
-        {isFeedback && (
-          <BottomActionBar
-            state={lesson.lastAnswerCorrect ? "correct" : "incorrect"}
-            onClick={lesson.nextExercise}
-            explanation={explanation}
-            mascot={mascot}
-          />
-        )}
+        <FeedbackModal
+          open={isFeedback}
+          isCorrect={!!lesson.lastAnswerCorrect}
+          explanation={explanation}
+          mascot={mascot}
+          exerciseId={lesson.currentExercise.id}
+          lessonId={lessonId}
+          onContinue={lesson.nextExercise}
+        />
         <HeartsEmptyModal
           open={showHeartsEmpty}
           onOpenChange={setShowHeartsEmpty}
           timeUntilNextHeart={null}
         />
-      </div>
+      </PageLayout>
     );
   }
 
