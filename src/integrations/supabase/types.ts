@@ -231,6 +231,48 @@ export type Database = {
         }
         Relationships: []
       }
+      exercise_error_reports: {
+        Row: {
+          created_at: string
+          description: string
+          exercise_id: string
+          id: string
+          lesson_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          exercise_id: string
+          id?: string
+          lesson_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          exercise_id?: string
+          id?: string
+          lesson_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_error_reports_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "learning_exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_error_reports_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "learning_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           created_at: string
