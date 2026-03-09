@@ -77,7 +77,8 @@ const App = () => (
                 </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
-              </Routes>
+                </Routes>
+              </RankUpProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
