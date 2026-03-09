@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/contexts/auth";
 import { ProfileAvatar } from "./ProfileAvatar";
+import { EditProfileDialog } from "./EditProfileDialog";
 import { getTribeCoverStyle } from "../utils/tribeCoverStyles";
 import type { CoffeeTribe } from "@/features/quiz";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Check, X, Camera, Loader2 } from "lucide-react";
+import { Pencil, Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/language";
@@ -19,10 +19,7 @@ import caldiLogo from "/lovable-uploads/8e78a6bd-5f00-45be-b082-c35b57fa9a7c.png
 export function ProfileHero() {
   const { user, profile, refreshProfile } = useAuth();
   const { t } = useLanguage();
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempName, setTempName] = useState("");
-  const [tempCity, setTempCity] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,38 +30,6 @@ export function ProfileHero() {
 
   const tribe = profile.coffee_tribe as CoffeeTribe | null;
   const coverStyle = getTribeCoverStyle(tribe);
-
-  const startEdit = () => {
-    setTempName(profile.display_name || "");
-    setTempCity(profile.city || "");
-    setIsEditing(true);
-  };
-
-  const cancelEdit = () => setIsEditing(false);
-
-  const saveEdit = async () => {
-    if (!tempName.trim()) {
-      toast.error(t("profile.nameRequired"));
-      return;
-    }
-    setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        display_name: tempName.trim(),
-        city: tempCity.trim() || null,
-      })
-      .eq("id", user.id);
-
-    if (error) {
-      toast.error(t("profile.failedSave"));
-    } else {
-      await refreshProfile();
-      toast.success(t("profile.profileSaved"));
-      setIsEditing(false);
-    }
-    setSaving(false);
-  };
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,73 +134,40 @@ export function ProfileHero() {
                 email={user.email}
                 variant="circle"
                 className="w-28 h-28 md:w-32 md:h-32 border-4 border-background"
-                showOverlayAlways={isEditing}
               />
             </div>
 
             {/* Info block */}
             <div className="flex items-start justify-between flex-1 min-w-0 pt-3 md:pt-0 md:pb-4">
               <div className="flex-1 min-w-0">
-                {isEditing ? (
-                  <div className="space-y-2 max-w-sm">
-                    <Input
-                      value={tempName}
-                      onChange={(e) => setTempName(e.target.value)}
-                      placeholder={t("profile.yourName")}
-                      className="text-xl font-bold !border-2"
-                      style={{ fontFamily: "'Bangers', cursive" }}
-                      autoFocus
-                    />
-                    <Input
-                      value={tempCity}
-                      onChange={(e) => setTempCity(e.target.value)}
-                      placeholder={t("profile.cityOptional")}
-                      className="!border-2"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <h1 className="text-2xl md:text-3xl truncate">
-                      {profile.display_name || t("profile.coffeeLover")}
-                    </h1>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {user.email}
-                    </p>
-                  </>
-                )}
+                <h1 className="text-2xl md:text-3xl truncate">
+                  {profile.display_name || t("profile.coffeeLover")}
+                </h1>
+                <p className="text-sm text-muted-foreground truncate">
+                  {user.email}
+                </p>
 
-                {!isEditing && (
-                  <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mt-2">
-                    <ProfileRankRow />
-                    <div className="flex items-center gap-3">
-                      <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
-                      {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
-                    </div>
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mt-2">
+                  <ProfileRankRow />
+                  <div className="flex items-center gap-3">
+                    <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
+                    {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Edit buttons */}
-              <div className="flex items-center gap-1 ml-2 pt-1">
-                {isEditing ? (
-                  <>
-                    <Button size="icon" variant="ghost" onClick={cancelEdit} disabled={saving} className="h-9 w-9">
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" onClick={saveEdit} disabled={saving} className="h-9 w-9">
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="icon" variant="ghost" onClick={startEdit} className="h-9 w-9">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
+              {/* Edit button → opens dialog */}
+              <div className="ml-2 pt-1">
+                <Button size="icon" variant="ghost" onClick={() => setEditOpen(true)} className="h-9 w-9">
+                  <Pencil className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }

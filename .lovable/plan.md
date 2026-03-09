@@ -1,46 +1,81 @@
 
 
-# Plan: Edit Profile Modal via Pencil Icon
+# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
 
-## What Changes
+## Root Cause
 
-Replace the inline name/city editing in `ProfileHero` and the separate `ProfileInfoForm` + `ChangePasswordForm` sections with a single **Edit Profile Dialog** triggered by the pencil icon. This removes the redundant form section from the page body.
+Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
 
-## New Component: `EditProfileDialog.tsx`
+```typescript
+const allText = JSON.stringify(sanitizedData).toLowerCase();
+```
 
-Create `src/features/profile/components/EditProfileDialog.tsx`:
-- A `Dialog` modal with tabs or sections for:
-  1. **Display Name** (text input)
-  2. **Email** (read-only, disabled)
-  3. **City** (text input)
-  4. **Change Password** (new password + confirm, collapsible or always visible)
-- Uses Zod validation (extend existing schemas)
-- Single "Save" button that updates profile fields and optionally password
-- On success: calls `refreshProfile()`, closes dialog, shows toast
+When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
 
-## File Changes
+## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
 
-### 1. `EditProfileDialog.tsx` (new)
-- Accepts `open`, `onOpenChange` props
-- Reads current profile data from `useAuth()`
-- Combines profile update + password update logic
-- Styled with project design tokens (4px borders, Bangers headings, shadows)
+### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
 
-### 2. `ProfileHero.tsx`
-- Remove all inline editing state (`isEditing`, `tempName`, `tempCity`, `saving`, `saveEdit`, `startEdit`, `cancelEdit`)
-- Remove the `Input` fields and check/X buttons
-- Pencil button now opens the `EditProfileDialog` via `useState<boolean>`
-- Keep cover upload logic as-is (separate concern)
+Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
 
-### 3. `ProfilePage.tsx`
-- Remove `ProfileInfoForm` and `ChangePasswordForm` from the page body
-- Remove the tribe+form grid and the password/retake-quiz grid
-- Keep: `ProfileHero`, `TribeSection`, `RetakeQuizSection`, collections tables, `FeedbackCTA`
-- Simplified layout: Hero → Tribe section → Retake Quiz → Collections → Feedback
+- `coffeeName`, `brand`
+- `variety`, `processingMethod`
+- `legacyRoastLevel` (text roast descriptor)
+- `originCountry`, `originRegion`, `originFarm`
+- `flavorNotes` (joined)
 
-### 4. `ProfileInfoForm.tsx`
-- Delete or keep for potential reuse — likely delete since logic moves to dialog
+**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
 
-### 5. Component index update
-- Export `EditProfileDialog` from `components/index.ts`
+```typescript
+// Build search text from ONLY the coffee's actual attributes
+const attributeText = [
+  sanitizedData.coffeeName,
+  sanitizedData.brand,
+  sanitizedData.variety,
+  sanitizedData.processingMethod,
+  sanitizedData.legacyRoastLevel,
+  sanitizedData.originCountry,
+  sanitizedData.originRegion,
+  sanitizedData.originFarm,
+  ...sanitizedData.flavorNotes,
+].filter(Boolean).join(" ").toLowerCase();
+```
+
+### 2. Strengthen the tribe context in the prompt (line 384-386)
+
+Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
+
+**Before:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+Consider these when calculating the tribe match score.
+```
+
+**After:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
+variety, processing method, roast level, origin, and flavor notes.
+Do NOT let references to other varietals or methods in jargon explanations
+influence the match assessment. For example, if the variety is "Caturra",
+do not count "Bourbon" as a match just because Caturra descends from Bourbon.
+```
+
+### 3. No model change
+
+Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
+
+## Impact
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
+| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
+| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
+
+Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
+
+## Implementation
+
+Single file edit with 2 changes, auto-deploys as edge function.
 
