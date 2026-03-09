@@ -44,6 +44,7 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
   const [newAchievements, setNewAchievements] = useState<LearningAchievement[]>([]);
   const [showAchievement, setShowAchievement] = useState<LearningAchievement | null>(null);
   const [isProcessingComplete, setIsProcessingComplete] = useState(false);
+  const [isReview, setIsReview] = useState(false);
 
   // Handle wrong answer: deduct heart for authenticated users
   const handleSubmitAnswer = useCallback(
