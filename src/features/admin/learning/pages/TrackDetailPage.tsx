@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminTrackById, toggleActive, deleteEntity } from "../services/adminLearningService";
+import { getAdminTrackById, toggleActive, deleteEntity, exportTrackFull } from "../services/adminLearningService";
 import { useAdminSections, useAdminUnitsForSections } from "../hooks/useAdminSections";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronDown, Upload, Trash2 } from "lucide-react";
+import { ChevronDown, Upload, Trash2, Download } from "lucide-react";
 import AdminBreadcrumb from "../components/AdminBreadcrumb";
 import ImportUnitModal from "../components/ImportUnitModal";
 
@@ -22,6 +22,26 @@ export default function TrackDetailPage() {
   const qc = useQueryClient();
   const [importSection, setImportSection] = useState<{ sectionId: string; unitCount: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!trackId) return;
+    setExporting(true);
+    try {
+      const data = await exportTrackFull(trackId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `track-${(data.name ?? "export").toLowerCase().replace(/\s+/g, "-")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed", err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data: track } = useQuery({
     queryKey: ["admin", "track", trackId],
@@ -56,9 +76,15 @@ export default function TrackDetailPage() {
 
       {track && (
         <div className="space-y-1">
-          <h2 className="font-heading text-2xl flex items-center gap-2">
-            <span>{track.icon}</span> {track.name}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-2xl flex items-center gap-2">
+              <span>{track.icon}</span> {track.name}
+            </h2>
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+              <Download className="h-3 w-3 mr-1" />
+              {exporting ? "Exporting…" : "Export Track JSON"}
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">{track.description}</p>
         </div>
       )}

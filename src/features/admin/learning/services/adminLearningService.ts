@@ -178,6 +178,72 @@ export async function deleteEntity(
   if (error) throw error;
 }
 
+export async function deleteExercisesByLessonId(lessonId: string) {
+  const { error } = await supabase
+    .from("learning_exercises")
+    .delete()
+    .eq("lesson_id", lessonId);
+  if (error) throw error;
+}
+
+export async function deleteLessonsByUnitId(unitId: string) {
+  const { error } = await supabase
+    .from("learning_lessons")
+    .delete()
+    .eq("unit_id", unitId);
+  if (error) throw error;
+}
+
+// ── Export ──
+
+export async function exportTrackFull(trackId: string) {
+  const track = await getAdminTrackById(trackId);
+  if (!track) throw new Error("Track not found");
+
+  const sections = await getAdminSections(track.id);
+  const sectionIds = sections.map((s) => s.id);
+
+  const units = sectionIds.length
+    ? await getAdminUnitsBySectionIds(sectionIds)
+    : [];
+  const unitIds = units.map((u) => u.id);
+
+  const lessons: AdminLessonRow[] = [];
+  // Batch in chunks to avoid URL-length limits
+  for (const uid of unitIds) {
+    const batch = await getAdminLessons(uid);
+    lessons.push(...batch);
+  }
+  const lessonIds = lessons.map((l) => l.id);
+
+  const exercises: AdminExerciseRow[] = [];
+  for (const lid of lessonIds) {
+    const batch = await getAdminExercises(lid);
+    exercises.push(...batch);
+  }
+
+  // Nest the hierarchy
+  const nested = {
+    ...track,
+    sections: sections.map((section) => ({
+      ...section,
+      units: units
+        .filter((u) => u.section_id === section.id)
+        .map((unit) => ({
+          ...unit,
+          lessons: lessons
+            .filter((l) => l.unit_id === unit.id)
+            .map((lesson) => ({
+              ...lesson,
+              exercises: exercises.filter((e) => e.lesson_id === lesson.id),
+            })),
+        })),
+    })),
+  };
+
+  return nested;
+}
+
 // ── Mutations ──
 
 export async function toggleActive(

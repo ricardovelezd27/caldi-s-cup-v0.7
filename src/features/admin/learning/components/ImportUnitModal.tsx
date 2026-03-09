@@ -8,7 +8,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, CheckCircle, Upload } from "lucide-react";
 import { validateUnitJson } from "../services/contentValidator";
 import { transformUnitForDb } from "../services/contentTransformer";
-import { upsertUnit, upsertLesson, upsertExercise } from "../services/adminLearningService";
+import { upsertUnit, upsertLesson, upsertExercise, getAdminLessons, deleteExercisesByLessonId, deleteEntity } from "../services/adminLearningService";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import type { ImportUnit, ValidationResult } from "../types/adminTypes";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -27,6 +29,7 @@ export default function ImportUnitModal({ open, onClose, sectionId, existingUnit
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [overrideMode, setOverrideMode] = useState(false);
   const qc = useQueryClient();
 
   const handleParse = () => {
@@ -46,6 +49,15 @@ export default function ImportUnitModal({ open, onClose, sectionId, existingUnit
       );
 
       const insertedUnit = await upsertUnit(unitRow);
+
+      // Override: delete existing nested content before inserting
+      if (overrideMode) {
+        const existingLessons = await getAdminLessons(insertedUnit.id);
+        for (const el of existingLessons) {
+          await deleteExercisesByLessonId(el.id);
+          await deleteEntity("learning_lessons", el.id);
+        }
+      }
 
       for (const { lessonRow, exercises } of lessons) {
         const insertedLesson = await upsertLesson({
@@ -77,6 +89,7 @@ export default function ImportUnitModal({ open, onClose, sectionId, existingUnit
     setRawJson("");
     setValidation(null);
     setPublishResult(null);
+    setOverrideMode(false);
     onClose();
   };
 
@@ -99,6 +112,18 @@ export default function ImportUnitModal({ open, onClose, sectionId, existingUnit
               className="font-mono text-xs min-h-[300px]"
               spellCheck={false}
             />
+            <div className="flex items-center gap-3">
+              <Switch id="override-mode" checked={overrideMode} onCheckedChange={setOverrideMode} />
+              <Label htmlFor="override-mode" className="text-sm font-medium cursor-pointer">Override existing content</Label>
+            </div>
+            {overrideMode && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  This will delete all existing lessons and exercises in the target unit before importing.
+                </AlertDescription>
+              </Alert>
+            )}
             {validation && !validation.valid && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />

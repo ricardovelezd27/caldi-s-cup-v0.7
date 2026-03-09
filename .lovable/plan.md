@@ -1,66 +1,81 @@
 
 
-# Plan: Export Track to JSON + Import Override Mode
+# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
 
-## 1. Export Track to JSON
+## Root Cause
 
-### Service layer (`adminLearningService.ts`)
-Add `exportTrackFull(trackId)` that fetches the entire hierarchy in 4 sequential queries:
-1. Track by ID
-2. Sections by track_id
-3. Units by section_ids (batch)
-4. Lessons by unit_ids (batch)
-5. Exercises by lesson_ids (batch)
+Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
 
-Returns a nested JSON object: `{ track, sections: [{ ...section, units: [{ ...unit, lessons: [{ ...lesson, exercises: [...] }] }] }] }`.
-
-### UI (`TrackDetailPage.tsx`)
-Add a "Export Track JSON" button (Download icon) next to the track heading. On click, calls `exportTrackFull`, serializes to JSON, creates a Blob, and triggers a download via a temporary `<a>` element. Filename: `track-{track.name slugified}.json`.
-
-## 2. Import Override Switch
-
-### UI (`ImportUnitModal.tsx`)
-- Add `overrideMode` boolean state (default false)
-- Render a `Switch` + `Label` ("Override existing content") in the paste step, below the textarea
-- Add a warning `Alert` when override is on: "This will delete all existing lessons and exercises in the target unit before importing."
-- Pass `overrideMode` to the publish logic
-
-### Override publish logic (inside `ImportUnitModal.handlePublish`)
-When `overrideMode` is true and the upserted unit already existed (has an ID matching an existing unit):
-1. After upserting the unit, fetch existing lessons for that unit via `getAdminLessons(unitId)`
-2. For each existing lesson, delete all its exercises via batch delete: `deleteExercisesByLessonId(lessonId)`
-3. Then delete all existing lessons via `deleteEntity("learning_lessons", lessonId)`
-4. Then insert the new lessons and exercises as normal
-
-### Service layer (`adminLearningService.ts`)
-Add one helper:
 ```typescript
-export async function deleteExercisesByLessonId(lessonId: string) {
-  const { error } = await supabase
-    .from("learning_exercises")
-    .delete()
-    .eq("lesson_id", lessonId);
-  if (error) throw error;
-}
-
-export async function deleteLessonsByUnitId(unitId: string) {
-  const { error } = await supabase
-    .from("learning_lessons")
-    .delete()
-    .eq("unit_id", unitId);
-  if (error) throw error;
-}
+const allText = JSON.stringify(sanitizedData).toLowerCase();
 ```
 
-Since exercises have a FK to lessons, we need to delete exercises first, then lessons. Alternatively if the FK has `ON DELETE CASCADE`, deleting lessons will cascade. Let me check -- the DB schema doesn't show cascade on FKs explicitly, so the safe approach is to delete exercises first, then lessons.
+When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
 
-## Files modified
+## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
 
-| File | Action |
-|------|--------|
-| `adminLearningService.ts` | Add `exportTrackFull`, `deleteExercisesByLessonId`, `deleteLessonsByUnitId` |
-| `TrackDetailPage.tsx` | Add Export button + download logic |
-| `ImportUnitModal.tsx` | Add Override switch + cascade-delete-before-insert logic |
+### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
 
-No database changes needed.
+Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+
+- `coffeeName`, `brand`
+- `variety`, `processingMethod`
+- `legacyRoastLevel` (text roast descriptor)
+- `originCountry`, `originRegion`, `originFarm`
+- `flavorNotes` (joined)
+
+**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
+
+```typescript
+// Build search text from ONLY the coffee's actual attributes
+const attributeText = [
+  sanitizedData.coffeeName,
+  sanitizedData.brand,
+  sanitizedData.variety,
+  sanitizedData.processingMethod,
+  sanitizedData.legacyRoastLevel,
+  sanitizedData.originCountry,
+  sanitizedData.originRegion,
+  sanitizedData.originFarm,
+  ...sanitizedData.flavorNotes,
+].filter(Boolean).join(" ").toLowerCase();
+```
+
+### 2. Strengthen the tribe context in the prompt (line 384-386)
+
+Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
+
+**Before:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+Consider these when calculating the tribe match score.
+```
+
+**After:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
+variety, processing method, roast level, origin, and flavor notes.
+Do NOT let references to other varietals or methods in jargon explanations
+influence the match assessment. For example, if the variety is "Caturra",
+do not count "Bourbon" as a match just because Caturra descends from Bourbon.
+```
+
+### 3. No model change
+
+Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
+
+## Impact
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
+| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
+| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
+
+Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
+
+## Implementation
+
+Single file edit with 2 changes, auto-deploys as edge function.
 
