@@ -8,6 +8,15 @@ export function LeagueLeaderboard() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { league, leaderboard, daysRemaining, isLoading } = useLeague();
+  const { currentRank } = useUserRank();
+
+  const getRankIcon = (xp: number) => {
+    let icon = BARISTA_RANKS[0].icon;
+    for (let i = BARISTA_RANKS.length - 1; i >= 0; i--) {
+      if (xp >= BARISTA_RANKS[i].minXP) { icon = BARISTA_RANKS[i].icon; break; }
+    }
+    return icon;
+  };
 
   if (isLoading) {
     return <p className="text-center text-muted-foreground font-inter py-8">{t("common.loading")}</p>;
