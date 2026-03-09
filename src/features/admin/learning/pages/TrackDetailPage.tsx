@@ -22,6 +22,26 @@ export default function TrackDetailPage() {
   const qc = useQueryClient();
   const [importSection, setImportSection] = useState<{ sectionId: string; unitCount: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!trackId) return;
+    setExporting(true);
+    try {
+      const data = await exportTrackFull(trackId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `track-${(data.name ?? "export").toLowerCase().replace(/\s+/g, "-")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed", err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data: track } = useQuery({
     queryKey: ["admin", "track", trackId],
