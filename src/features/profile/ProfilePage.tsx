@@ -46,6 +46,10 @@ function ProfileContent() {
                 email={user.email}
               />
               <ProfileRankRow />
+              <div className="flex items-center gap-3">
+                <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
+                {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
+              </div>
               <div>
                 <h2 className="text-xl md:text-2xl mb-3">{t("profile.tribeHeading")}</h2>
                 <TribeSection tribe={profile.coffee_tribe} />
