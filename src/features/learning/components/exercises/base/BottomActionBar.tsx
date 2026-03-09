@@ -27,7 +27,7 @@ export function BottomActionBar({ state, onClick, explanation, mascot = "caldi" 
   return (
     <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 transition-all duration-300",
+        "sticky bottom-0 z-40 transition-all duration-300",
         state === "correct" && "bg-[hsl(142_76%_90%)] border-t-2 border-[hsl(142_71%_45%)]",
         state === "incorrect" && "bg-accent/10 border-t-2 border-accent",
         !isFeedback && "bg-background/95 backdrop-blur-sm border-t border-border/20",
