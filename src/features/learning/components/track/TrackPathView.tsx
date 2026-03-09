@@ -1,9 +1,23 @@
 import { useLanguage } from "@/contexts/language";
-import { Lock, Check, Circle } from "lucide-react";
+import { Lock, Check, Circle, Coffee } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import type { TrackPathSection, TrackPathLesson } from "../../hooks/useTrackPath";
 import type { LearningUserProgress } from "../../types";
+
+const DECAY_JOKES_EN = [
+  "Brrr... your coffee is getting cold! 🥶",
+  "These beans are going stale. Time to review! 🫘",
+  "Your crema is fading! Reheat your skills. ☕",
+  "Extraction dropping... pull this shot again! 📉",
+];
+
+const DECAY_JOKES_ES = [
+  "Brrr... ¡tu café se está enfriando! 🥶",
+  "Estos granos se están poniendo rancios. ¡Hora de repasar! 🫘",
+  "¡Tu crema se desvanece! Recalienta tus habilidades. ☕",
+  "Extracción bajando... ¡tira este shot de nuevo! 📉",
+];
 
 interface TrackPathViewProps {
   sections: TrackPathSection[];
@@ -14,12 +28,16 @@ interface TrackPathViewProps {
 function LessonNode({ lesson, trackId, language }: { lesson: TrackPathLesson; trackId: string; language: string }) {
   const name = language === "es" ? lesson.nameEs : lesson.name;
   const minutes = lesson.estimatedMinutes;
+  const isDecayed = lesson.status === "decayed";
+
+  const jokes = language === "es" ? DECAY_JOKES_ES : DECAY_JOKES_EN;
+  const joke = jokes[lesson.id.charCodeAt(0) % jokes.length];
 
   const nodeContent = (
     <div className={cn(
       "flex items-center gap-3 py-2 group",
       lesson.status === "locked" && "opacity-50",
-      lesson.status === "available" && "cursor-pointer",
+      (lesson.status === "available" || isDecayed) && "cursor-pointer",
     )}>
       {/* Status circle */}
       <div className={cn(
@@ -27,12 +45,14 @@ function LessonNode({ lesson, trackId, language }: { lesson: TrackPathLesson; tr
         lesson.status === "completed" && "bg-secondary border-secondary text-secondary-foreground",
         lesson.status === "available" && "border-primary bg-primary/10 animate-pulse",
         lesson.status === "locked" && "border-border bg-muted",
+        isDecayed && "bg-amber-100 border-amber-500 text-amber-600",
       )}
-        style={{ boxShadow: lesson.status === "available" ? "2px 2px 0px 0px hsl(var(--border))" : undefined }}
+        style={{ boxShadow: (lesson.status === "available" || isDecayed) ? "2px 2px 0px 0px hsl(var(--border))" : undefined }}
       >
         {lesson.status === "completed" && <Check className="w-5 h-5" />}
         {lesson.status === "available" && <Circle className="w-4 h-4 fill-primary text-primary" />}
         {lesson.status === "locked" && <Lock className="w-4 h-4 text-muted-foreground" />}
+        {isDecayed && <Coffee className="w-5 h-5" />}
       </div>
 
       {/* Lesson info */}
@@ -42,17 +62,24 @@ function LessonNode({ lesson, trackId, language }: { lesson: TrackPathLesson; tr
           lesson.status === "completed" && "text-secondary",
           lesson.status === "available" && "text-foreground",
           lesson.status === "locked" && "text-muted-foreground",
+          isDecayed && "text-amber-600",
         )}>
           {name}
         </p>
-        <p className="text-xs text-muted-foreground font-inter">
-          {minutes} min · {lesson.xpReward} XP
-        </p>
+        {isDecayed ? (
+          <p className="text-xs text-amber-500 font-inter italic">
+            {joke}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground font-inter">
+            {minutes} min · {lesson.xpReward} XP
+          </p>
+        )}
       </div>
     </div>
   );
 
-  if (lesson.status === "available") {
+  if (lesson.status === "available" || isDecayed) {
     return (
       <Link to={`/learn/${trackId}/${lesson.id}`} className="block hover:bg-accent/10 rounded-lg px-2 -mx-2 transition-colors">
         {nodeContent}
