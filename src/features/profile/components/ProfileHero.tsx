@@ -154,9 +154,17 @@ export function ProfileHero() {
 
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mt-2">
                   <ProfileRankRow />
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
                     {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+                      <Heart className="h-3.5 w-3.5" />
+                      {favoriteIds.length}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                      <Package className="h-3.5 w-3.5" />
+                      {inventoryItems.length}
+                    </span>
                   </div>
                 </div>
               </div>
