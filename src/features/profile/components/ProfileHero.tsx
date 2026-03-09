@@ -209,7 +209,7 @@ export function ProfileHero() {
             {!isEditing && (
               <div className="flex items-center gap-3 mt-2">
                 <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
-                {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size={44} />}
+                {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
               </div>
             )}
           </div>
