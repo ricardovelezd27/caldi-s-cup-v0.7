@@ -27,11 +27,20 @@ export function ScanProgress({ progress }: ScanProgressProps) {
 
   const isError = progress.status === "error";
 
+  const getProgressMessage = () => {
+    switch (progress.status) {
+      case "uploading": return t('scanner.progressUploading');
+      case "analyzing": return t('scanner.progressAnalyzing');
+      case "enriching": return t('scanner.progressEnriching');
+      case "complete": return t('scanner.progressComplete');
+      default: return progress.message;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <Progress value={progress.progress} className="h-3 border-2 border-border" />
-        <p className="text-center text-sm text-muted-foreground">{progress.message}</p>
       </div>
       <div className="flex justify-between">
         {steps.map((step, index) => {
