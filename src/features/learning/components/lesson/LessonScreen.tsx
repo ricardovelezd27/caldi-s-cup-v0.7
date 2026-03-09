@@ -137,16 +137,15 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
       if (unlocked.length > 0) {
         setNewAchievements(unlocked);
         setShowAchievement(unlocked[0]);
+      } else {
+        onComplete();
       }
     } catch (err) {
       console.error("Gamification update failed:", err);
+      onComplete();
     } finally {
       setIsProcessingComplete(false);
       refreshProfile();
-      // Navigate if no achievements to show
-      if (newAchievements.length === 0) {
-        onComplete();
-      }
     }
   }, [user, lesson, lessonId, streak, anonymousProgress, onComplete, addDailyXP, checkAndUnlockAchievements]);
 
