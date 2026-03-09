@@ -943,10 +943,12 @@ export type Database = {
           coffee_tribe: Database["public"]["Enums"]["coffee_tribe"] | null
           cover_url: string | null
           created_at: string
+          current_streak: number
           display_name: string | null
           id: string
           is_onboarded: boolean | null
           onboarded_at: string | null
+          total_xp: number
           updated_at: string
           weekly_goal_target: number | null
         }
@@ -957,10 +959,12 @@ export type Database = {
           coffee_tribe?: Database["public"]["Enums"]["coffee_tribe"] | null
           cover_url?: string | null
           created_at?: string
+          current_streak?: number
           display_name?: string | null
           id: string
           is_onboarded?: boolean | null
           onboarded_at?: string | null
+          total_xp?: number
           updated_at?: string
           weekly_goal_target?: number | null
         }
@@ -971,10 +975,12 @@ export type Database = {
           coffee_tribe?: Database["public"]["Enums"]["coffee_tribe"] | null
           cover_url?: string | null
           created_at?: string
+          current_streak?: number
           display_name?: string | null
           id?: string
           is_onboarded?: boolean | null
           onboarded_at?: string | null
+          total_xp?: number
           updated_at?: string
           weekly_goal_target?: number | null
         }
@@ -1276,6 +1282,30 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_xp_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          user_id: string
+          xp_amount: number
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          user_id: string
+          xp_amount: number
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+          xp_amount?: number
         }
         Relationships: []
       }
