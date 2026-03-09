@@ -551,6 +551,7 @@ export const en = {
       diagnose: "Diagnose",
       showHint: "Show hint",
       hideHint: "Hide hint",
+      gotIt: "Got it",
     },
     leaderboard: {
       title: "Leaderboard",

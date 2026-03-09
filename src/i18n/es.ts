@@ -538,6 +538,7 @@ export const es = {
       diagnose: "Diagnosticar",
       showHint: "Mostrar pista",
       hideHint: "Ocultar pista",
+      gotIt: "Entendido",
     },
     leaderboard: {
       title: "Clasificación",
