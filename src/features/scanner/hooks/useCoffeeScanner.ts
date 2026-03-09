@@ -1,6 +1,9 @@
 import { useState, useCallback } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/auth";
+import { awardXP } from "@/services/gamification/xpService";
+import { updateStreakOnAction } from "@/services/gamification/streakService";
 import type { ScannedCoffee, ScanProgress, ScanResponse } from "../types/scanner";
 import { SCAN_PROGRESS_STATES } from "../types/scanner";
 
@@ -110,6 +113,14 @@ export function useCoffeeScanner() {
       // Step 4: Complete
       setProgress(SCAN_PROGRESS_STATES.complete);
       setScanResult(result.data);
+
+      // Gamification: award XP for successful scan (fire-and-forget)
+      if (user) {
+        awardXP(user.id, "scan_coffee_bag", 10)
+          .then(() => updateStreakOnAction(user.id))
+          .catch((err) => console.error("[Gamification]", err));
+        toast.success("☕ +10 XP — Coffee Scanned!");
+      }
       
       return result.data;
     } catch (err) {

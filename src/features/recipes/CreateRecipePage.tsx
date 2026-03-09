@@ -6,15 +6,18 @@ import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/app";
 import { RecipeForm } from "./components";
 import { useCreateRecipe } from "./services";
+import { useAwardXP } from "@/hooks/gamification";
 import type { RecipeFormData } from "./types/recipe";
 
 export function CreateRecipePage() {
   const navigate = useNavigate();
   const createMutation = useCreateRecipe();
+  const { rewardAction } = useAwardXP();
 
   const handleSubmit = async (data: RecipeFormData) => {
     try {
       await createMutation.mutateAsync(data);
+      rewardAction("log_brew_recipe", 20, "Recipe Created"); // fire-and-forget
       toast.success("Recipe created successfully!");
       navigate(ROUTES.recipes);
     } catch (error) {

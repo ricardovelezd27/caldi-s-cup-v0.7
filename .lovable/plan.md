@@ -1,90 +1,81 @@
 
 
-# Plan: Wire Global Gamification to Scanner and Recipe Features
+# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
 
-## Overview
-Create a unified `useAwardXP` React hook that combines XP awarding + streak updating + visual feedback, then integrate it into the scanner and recipe creation flows.
+## Root Cause
 
-## 1. Create `useAwardXP` Hook (`src/hooks/gamification/useAwardXP.ts`)
-
-A single hook that encapsulates the full gamification reward flow:
-- Calls `awardXP(userId, actionType, xpAmount)` from the global service
-- Automatically calls `updateStreakOnAction(userId)` on success
-- Returns `{ rewardAction, pendingXP }` where `rewardAction` is an async function and `pendingXP` tracks the last awarded amount for animation
-- Shows a `toast.success` with XP earned (e.g., "☕ +10 XP — Coffee Scanned!")
-- Fires-and-forgets (non-blocking) so it doesn't slow down the main UX flow
-- Silently catches errors (logs to console, never blocks the user)
+Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
 
 ```typescript
-export function useAwardXP() {
-  const { user } = useAuth();
-  const [pendingXP, setPendingXP] = useState(0);
-
-  const rewardAction = useCallback(async (actionType: string, xpAmount: number, label?: string) => {
-    if (!user) return;
-    try {
-      await awardXP(user.id, actionType, xpAmount);
-      await updateStreakOnAction(user.id);
-      setPendingXP(xpAmount);
-      toast.success(`☕ +${xpAmount} XP — ${label || actionType}!`);
-      setTimeout(() => setPendingXP(0), 2000);
-    } catch (err) {
-      console.error("[Gamification] Failed to award XP:", err);
-    }
-  }, [user]);
-
-  return { rewardAction, pendingXP };
-}
+const allText = JSON.stringify(sanitizedData).toLowerCase();
 ```
 
-Export from `src/hooks/gamification/index.ts`.
+When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
 
-## 2. Wire Scanner (`src/features/scanner/hooks/useCoffeeScanner.ts`)
+## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
 
-After the scan completes successfully (line ~112, after `setScanResult`):
-- Import and call `awardXP` + `updateStreakOnAction` directly from services (since this is a hook, not a component — we have `user` from `useAuth` already)
-- Fire-and-forget: `awardXP(user.id, 'scan_coffee_bag', 10)` then `updateStreakOnAction(user.id)` — wrapped in try/catch, non-blocking
-- The visual toast feedback will be handled at the component level using the `useAwardXP` hook or by adding a toast call here
+### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
 
-**Approach**: Since `useCoffeeScanner` already has `user` from `useAuth`, we'll call the service functions directly and show a toast:
+Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+
+- `coffeeName`, `brand`
+- `variety`, `processingMethod`
+- `legacyRoastLevel` (text roast descriptor)
+- `originCountry`, `originRegion`, `originFarm`
+- `flavorNotes` (joined)
+
+**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
 
 ```typescript
-// After setScanResult(result.data) on line 112:
-if (user) {
-  awardXP(user.id, 'scan_coffee_bag', 10)
-    .then(() => updateStreakOnAction(user.id))
-    .catch(err => console.error("[Gamification]", err));
-  toast.success("☕ +10 XP — Coffee Scanned!");
-}
+// Build search text from ONLY the coffee's actual attributes
+const attributeText = [
+  sanitizedData.coffeeName,
+  sanitizedData.brand,
+  sanitizedData.variety,
+  sanitizedData.processingMethod,
+  sanitizedData.legacyRoastLevel,
+  sanitizedData.originCountry,
+  sanitizedData.originRegion,
+  sanitizedData.originFarm,
+  ...sanitizedData.flavorNotes,
+].filter(Boolean).join(" ").toLowerCase();
 ```
 
-## 3. Wire Recipe Creation (`src/features/recipes/CreateRecipePage.tsx`)
+### 2. Strengthen the tribe context in the prompt (line 384-386)
 
-In `handleSubmit`, after `createMutation.mutateAsync` succeeds:
-- Use the `useAwardXP` hook at the component level
-- Call `rewardAction('log_brew_recipe', 20, 'Recipe Created')` before navigating
+Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
 
-```typescript
-const { rewardAction } = useAwardXP();
-
-const handleSubmit = async (data: RecipeFormData) => {
-  try {
-    await createMutation.mutateAsync(data);
-    rewardAction('log_brew_recipe', 20, 'Recipe Created'); // fire-and-forget
-    toast.success("Recipe created successfully!");
-    navigate(ROUTES.recipes);
-  } catch { ... }
-};
+**Before:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+Consider these when calculating the tribe match score.
 ```
 
-## Files Modified
+**After:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
+variety, processing method, roast level, origin, and flavor notes.
+Do NOT let references to other varietals or methods in jargon explanations
+influence the match assessment. For example, if the variety is "Caturra",
+do not count "Bourbon" as a match just because Caturra descends from Bourbon.
+```
 
-| File | Change |
-|------|--------|
-| `src/hooks/gamification/useAwardXP.ts` | **New** — unified reward hook |
-| `src/hooks/gamification/index.ts` | Add `useAwardXP` export |
-| `src/features/scanner/hooks/useCoffeeScanner.ts` | Award 10 XP on successful scan |
-| `src/features/recipes/CreateRecipePage.tsx` | Award 20 XP on recipe creation |
+### 3. No model change
 
-No database changes needed — uses existing `user_xp_logs` table and `profiles.total_xp`/`current_streak` columns.
+Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
+
+## Impact
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
+| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
+| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
+
+Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
+
+## Implementation
+
+Single file edit with 2 changes, auto-deploys as edge function.
 
