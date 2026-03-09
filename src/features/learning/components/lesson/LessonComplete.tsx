@@ -59,7 +59,9 @@ export function LessonComplete({
       {xpBreakdown && (
         <div className="bg-card border-4 border-border rounded-lg p-3 mb-4 text-sm font-inter text-left w-full max-w-xs shadow-[4px_4px_0px_0px_var(--border)]">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">{t("gamification.baseXP")}</span>
+            <span className="text-muted-foreground">
+              {isReview ? `☕ ${t("gamification.reviewBonus")}` : t("gamification.baseXP")}
+            </span>
             <span className="font-bold text-foreground">+{xpBreakdown.baseXP}</span>
           </div>
           {xpBreakdown.bonuses.perfect > 0 && (
