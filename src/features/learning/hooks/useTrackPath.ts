@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { differenceInDays } from "date-fns";
 import { getTracks, getSections, getUnitsBySectionIds, getLessonsByUnitIds } from "../services/learningService";
 import { getUserProgress } from "../services/progressService";
 import { useAuth } from "@/contexts/auth";
-import type { LearningSection, LearningUnit, LearningLesson } from "../types";
+import type { LearningSection, LearningUnit, LearningLesson, LearningUserProgress } from "../types";
+
+const DECAY_THRESHOLD_DAYS = 14;
 
 export interface TrackPathSection extends LearningSection {
   units: TrackPathUnit[];
@@ -13,7 +16,7 @@ export interface TrackPathUnit extends LearningUnit {
 }
 
 export interface TrackPathLesson extends LearningLesson {
-  status: "completed" | "available" | "locked";
+  status: "completed" | "available" | "locked" | "decayed";
 }
 
 export function useTrackPath(trackIdParam: string) {
@@ -56,8 +59,11 @@ export function useTrackPath(trackIdParam: string) {
     enabled: !!user,
   });
 
-  const completedLessonIds = new Set(
-    (progressQuery.data ?? []).filter((p) => p.isCompleted).map((p) => p.lessonId),
+  // Build progress map: lessonId -> progress record (for timestamp access)
+  const progressByLessonId = new Map<string, LearningUserProgress>(
+    (progressQuery.data ?? [])
+      .filter((p) => p.isCompleted)
+      .map((p) => [p.lessonId, p]),
   );
 
   // Build nested structure with status
@@ -76,10 +82,21 @@ export function useTrackPath(trackIdParam: string) {
           .filter((l) => l.unitId === unit.id)
           .map((lesson): TrackPathLesson => {
             totalLessons++;
-            if (completedLessonIds.has(lesson.id)) {
+            const progress = progressByLessonId.get(lesson.id);
+            
+            if (progress) {
               completedCount++;
+              // Check for decay: use updatedAt, fallback to completedAt
+              const lastActivityDate = progress.updatedAt || progress.completedAt;
+              if (lastActivityDate) {
+                const daysSinceUpdate = differenceInDays(new Date(), new Date(lastActivityDate));
+                if (daysSinceUpdate >= DECAY_THRESHOLD_DAYS) {
+                  return { ...lesson, status: "decayed" };
+                }
+              }
               return { ...lesson, status: "completed" };
             }
+            
             if (!foundFirstAvailable) {
               foundFirstAvailable = true;
               return { ...lesson, status: "available" };
@@ -98,7 +115,7 @@ export function useTrackPath(trackIdParam: string) {
   return {
     track: track ?? null,
     sections,
-    progressMap: completedLessonIds,
+    progressMap: progressByLessonId,
     overallPercent,
     isLoading: tracksQuery.isLoading || sectionsQuery.isLoading || unitsQuery.isLoading || lessonsQuery.isLoading,
   };
