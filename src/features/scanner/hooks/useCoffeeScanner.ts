@@ -1,6 +1,9 @@
 import { useState, useCallback } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/auth";
+import { awardXP } from "@/services/gamification/xpService";
+import { updateStreakOnAction } from "@/services/gamification/streakService";
 import type { ScannedCoffee, ScanProgress, ScanResponse } from "../types/scanner";
 import { SCAN_PROGRESS_STATES } from "../types/scanner";
 
