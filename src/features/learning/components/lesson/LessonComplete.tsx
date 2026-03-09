@@ -14,6 +14,7 @@ interface LessonCompleteProps {
   onNext?: () => void;
   onBackToTrack: () => void;
   isProcessing?: boolean;
+  isReview?: boolean;
 }
 
 export function LessonComplete({
@@ -25,6 +26,7 @@ export function LessonComplete({
   onNext,
   onBackToTrack,
   isProcessing,
+  isReview,
 }: LessonCompleteProps) {
   const { t } = useLanguage();
   const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -42,9 +44,11 @@ export function LessonComplete({
       </div>
 
       <h2 className="font-bangers text-3xl text-foreground tracking-wide mb-2">
-        {t("learn.lessonComplete")}
+        {isReview ? t("learn.lessonReheated") : t("learn.lessonComplete")}
       </h2>
-      <p className="text-muted-foreground font-inter mb-4">{t("learn.greatJob")}</p>
+      <p className="text-muted-foreground font-inter mb-4">
+        {isReview ? t("learn.skillsReheated") : t("learn.greatJob")}
+      </p>
 
       <div className="relative mb-2">
         <XPCounter xp={xpEarned} className="mb-2" />
@@ -55,7 +59,9 @@ export function LessonComplete({
       {xpBreakdown && (
         <div className="bg-card border-4 border-border rounded-lg p-3 mb-4 text-sm font-inter text-left w-full max-w-xs shadow-[4px_4px_0px_0px_var(--border)]">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">{t("gamification.baseXP")}</span>
+            <span className="text-muted-foreground">
+              {isReview ? `☕ ${t("gamification.reviewBonus")}` : t("gamification.baseXP")}
+            </span>
             <span className="font-bold text-foreground">+{xpBreakdown.baseXP}</span>
           </div>
           {xpBreakdown.bonuses.perfect > 0 && (

@@ -9,7 +9,7 @@ import { useAchievements } from "../../hooks/useAchievements";
 import { calculateLessonXP } from "../../services/xpService";
 import { updateStreakViaRPC, addXPToDaily } from "../../services/streakService";
 import { addWeeklyXP } from "../../services/leagueService";
-import { upsertLessonProgress } from "../../services/progressService";
+import { upsertLessonProgress, getLessonProgress } from "../../services/progressService";
 import { LessonIntro } from "./LessonIntro";
 import { LessonProgress } from "./LessonProgress";
 import { LessonComplete } from "./LessonComplete";
@@ -44,6 +44,7 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
   const [newAchievements, setNewAchievements] = useState<LearningAchievement[]>([]);
   const [showAchievement, setShowAchievement] = useState<LearningAchievement | null>(null);
   const [isProcessingComplete, setIsProcessingComplete] = useState(false);
+  const [isReview, setIsReview] = useState(false);
 
   // Handle wrong answer: deduct heart for authenticated users
   const handleSubmitAnswer = useCallback(
@@ -62,7 +63,8 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
     [lesson, user, loseHeart, hearts],
   );
 
-  // Process gamification on lesson completion
+  const REVIEW_XP_BASE = 5;
+
   const handleLessonDone = useCallback(async () => {
     if (!user) {
       anonymousProgress.completeLesson(lessonId, 10);
@@ -76,12 +78,18 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
 
     setIsProcessingComplete(true);
     try {
-      const baseXpReward = lesson.lesson?.xpReward ?? 10;
+      // Check if this is a review (lesson already completed)
+      const existingProgress = await getLessonProgress(user.id, lessonId);
+      const isReviewAttempt = !!existingProgress?.isCompleted;
+      setIsReview(isReviewAttempt);
+
+      const fullBaseXp = lesson.lesson?.xpReward ?? 10;
+      const baseXpReward = isReviewAttempt ? REVIEW_XP_BASE : fullBaseXp;
       const currentStreak = streak?.currentStreak ?? 0;
       const today = new Date().toISOString().split("T")[0];
       const isFirstToday = streak?.lastActivityDate !== today;
 
-      // 1. Calculate XP
+      // 1. Calculate XP (reduced base for reviews)
       const xpCalc = calculateLessonXP(
         baseXpReward,
         lesson.score.correct,
@@ -216,6 +224,7 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
           timeSpent={lesson.timeSpent}
           onBackToTrack={handleLessonDone}
           isProcessing={isProcessingComplete}
+          isReview={isReview}
         />
         <SignupPrompt
           open={showSignup}
