@@ -1,81 +1,35 @@
 
 
-# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
+# Plan: Display User Rank in Dashboard, Profile, and Leaderboard
 
-## Root Cause
+## 1. Dashboard Hero (`src/features/dashboard/widgets/WelcomeHeroWidget.tsx`)
 
-Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
+Import `useUserRank` and `Progress` component. Below the welcome greeting and tribe tagline, add:
+- A rank badge: `currentRank.icon` + `currentRank.name` styled with the rank's `colorClass`, using a small inline `Badge` component
+- A `<Progress>` bar showing `progressToNext`
+- A subtitle: "{xpNeeded} XP to {nextRank.name}" (or "Max Rank Achieved!" if Coffee Master)
 
-```typescript
-const allText = JSON.stringify(sanitizedData).toLowerCase();
-```
+## 2. Profile Hero (`src/features/profile/components/ProfileHero.tsx`)
 
-When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
+Below the tribe tagline (line ~209), add a rank display row (visible when not editing):
+- Show `currentRank.icon` + `currentRank.name` with the rank's `colorClass`
+- A compact progress bar + "{totalXP} XP" label
+- Import `useUserRank` from `@/features/gamification`
 
-## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
+## 3. Leaderboard (`src/features/learning/components/gamification/LeagueLeaderboard.tsx`)
 
-### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
+Replace the generic `👤` avatar emoji (line 65) with a rank-aware icon:
+- Import `BARISTA_RANKS` from `@/features/gamification`
+- For each leaderboard entry, derive the rank icon from `entry.weeklyXp` (or total XP if available). Since leaderboard entries only have `weeklyXp`, we'll use `BARISTA_RANKS` to find the matching rank based on that value and display its icon instead of `👤`
+- For the current user (`isMe`), use `useUserRank()` to show their actual rank icon
 
-Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+## Files Modified
 
-- `coffeeName`, `brand`
-- `variety`, `processingMethod`
-- `legacyRoastLevel` (text roast descriptor)
-- `originCountry`, `originRegion`, `originFarm`
-- `flavorNotes` (joined)
+| File | Change |
+|------|--------|
+| `src/features/dashboard/widgets/WelcomeHeroWidget.tsx` | Add rank badge + progress bar |
+| `src/features/profile/components/ProfileHero.tsx` | Add rank display below tribe info |
+| `src/features/learning/components/gamification/LeagueLeaderboard.tsx` | Replace `👤` with rank icons |
 
-**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
-
-```typescript
-// Build search text from ONLY the coffee's actual attributes
-const attributeText = [
-  sanitizedData.coffeeName,
-  sanitizedData.brand,
-  sanitizedData.variety,
-  sanitizedData.processingMethod,
-  sanitizedData.legacyRoastLevel,
-  sanitizedData.originCountry,
-  sanitizedData.originRegion,
-  sanitizedData.originFarm,
-  ...sanitizedData.flavorNotes,
-].filter(Boolean).join(" ").toLowerCase();
-```
-
-### 2. Strengthen the tribe context in the prompt (line 384-386)
-
-Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
-
-**Before:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-Consider these when calculating the tribe match score.
-```
-
-**After:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
-variety, processing method, roast level, origin, and flavor notes.
-Do NOT let references to other varietals or methods in jargon explanations
-influence the match assessment. For example, if the variety is "Caturra",
-do not count "Bourbon" as a match just because Caturra descends from Bourbon.
-```
-
-### 3. No model change
-
-Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
-
-## Impact
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
-| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
-| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
-
-Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
-
-## Implementation
-
-Single file edit with 2 changes, auto-deploys as edge function.
+No new files. No database changes.
 
