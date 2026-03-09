@@ -8,7 +8,7 @@ export type ExerciseType =
   | 'multiple_choice' | 'fill_in_blank' | 'true_false'
   | 'matching_pairs' | 'sequencing' | 'image_identification'
   | 'categorization' | 'troubleshooting' | 'recipe_building'
-  | 'calculation' | 'prediction' | 'comparison';
+  | 'prediction' | 'comparison';
 
 export type CoffeeTribe = 'fox' | 'owl' | 'hummingbird' | 'bee';
 

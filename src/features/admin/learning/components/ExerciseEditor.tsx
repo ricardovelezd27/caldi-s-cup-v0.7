@@ -3,13 +3,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { AdminExerciseRow } from "../services/adminLearningService";
 import type { Json } from "@/integrations/supabase/types";
+import {
+  TrueFalseForm,
+  MultipleChoiceForm,
+  FillInBlankForm,
+  MatchingPairsForm,
+  SequencingForm,
+  GenericJsonForm,
+} from "./exercise-forms";
 
 const MOODS = ["neutral", "curious", "thinking", "encouraging", "celebrating", "excited", "happy", "confused"];
 
@@ -33,23 +40,18 @@ export default function ExerciseEditor({ exercise, open, onClose, onSave }: Prop
   const [difficulty, setDifficulty] = useState(exercise.difficulty_score);
   const [active, setActive] = useState(exercise.is_active);
   const [tags, setTags] = useState(exercise.concept_tags.join(", "));
-  const [jsonStr, setJsonStr] = useState(JSON.stringify(exercise.question_data, null, 2));
+  const [questionData, setQuestionData] = useState<Record<string, any>>(
+    exercise.question_data as Record<string, any>,
+  );
   const [jsonError, setJsonError] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    let parsed: Json;
-    try {
-      parsed = JSON.parse(jsonStr);
-      setJsonError("");
-    } catch {
-      setJsonError("Invalid JSON");
-      return;
-    }
+    if (jsonError) return;
     setSaving(true);
     try {
       await onSave({
-        question_data: parsed,
+        question_data: questionData as Json,
         mascot,
         mascot_mood: mood,
         difficulty_score: difficulty,
@@ -58,6 +60,32 @@ export default function ExerciseEditor({ exercise, open, onClose, onSave }: Prop
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const renderQuestionForm = () => {
+    const type = exercise.exercise_type;
+
+    switch (type) {
+      case "true_false":
+        return <TrueFalseForm data={questionData} onChange={setQuestionData} />;
+      case "multiple_choice":
+        return <MultipleChoiceForm data={questionData} onChange={setQuestionData} />;
+      case "fill_in_blank":
+        return <FillInBlankForm data={questionData} onChange={setQuestionData} />;
+      case "matching_pairs":
+        return <MatchingPairsForm data={questionData} onChange={setQuestionData} />;
+      case "sequencing":
+        return <SequencingForm data={questionData} onChange={setQuestionData} />;
+      default:
+        return (
+          <GenericJsonForm
+            data={questionData}
+            onChange={setQuestionData}
+            error={jsonError}
+            onError={setJsonError}
+          />
+        );
     }
   };
 
@@ -122,25 +150,16 @@ export default function ExerciseEditor({ exercise, open, onClose, onSave }: Prop
             <Input value={tags} onChange={(e) => setTags(e.target.value)} />
           </div>
 
-          {/* JSON Editor */}
-          <div className="space-y-2">
-            <Label>question_data (JSON)</Label>
-            <Textarea
-              value={jsonStr}
-              onChange={(e) => {
-                setJsonStr(e.target.value);
-                setJsonError("");
-              }}
-              className="font-mono text-xs min-h-[200px]"
-              spellCheck={false}
-            />
-            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+          {/* Question Data Form */}
+          <div className="border-t-4 border-border pt-4">
+            <h3 className="font-heading text-lg mb-3">Question Content</h3>
+            {renderQuestionForm()}
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !!jsonError}>
             {saving ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>

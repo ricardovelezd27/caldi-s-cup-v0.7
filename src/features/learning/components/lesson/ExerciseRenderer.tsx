@@ -9,7 +9,6 @@ import { ImageIdentification } from "../exercises/knowledge/ImageIdentification"
 import { Categorization } from "../exercises/knowledge/Categorization";
 import { Troubleshooting } from "../exercises/applied/Troubleshooting";
 import { RecipeBuilding } from "../exercises/applied/RecipeBuilding";
-import { Calculation } from "../exercises/applied/Calculation";
 import { Prediction } from "../exercises/applied/Prediction";
 import { Comparison } from "../exercises/applied/Comparison";
 
@@ -45,8 +44,6 @@ export function ExerciseRenderer({ exercise, onAnswer, disabled }: ExerciseRende
       return <Troubleshooting data={qd} onSubmit={handleSubmit} disabled={disabled} />;
     case "recipe_building":
       return <RecipeBuilding data={qd} onSubmit={handleSubmit} disabled={disabled} />;
-    case "calculation":
-      return <Calculation data={qd} onSubmit={handleSubmit} disabled={disabled} />;
     case "prediction":
       return <Prediction data={qd} onSubmit={handleSubmit} disabled={disabled} />;
     case "comparison":
