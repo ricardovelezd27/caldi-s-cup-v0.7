@@ -3,7 +3,8 @@ import { useAuth } from "@/contexts/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 
-const REFILL_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const REFILL_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_MAX_HEARTS = 5;
 
 export function useHearts() {
   const { user } = useAuth();
@@ -26,9 +27,8 @@ export function useHearts() {
 
   const raw = heartsQuery.data;
 
-  // Compute how many hearts should have refilled since last refill
   const computed = useMemo(() => {
-    if (!raw) return { hearts: 5, maxHearts: 5, timeUntilNext: null as number | null };
+    if (!raw) return { hearts: DEFAULT_MAX_HEARTS, maxHearts: DEFAULT_MAX_HEARTS, timeUntilNext: null as number | null };
 
     const lastRefill = raw.hearts_last_refilled_at
       ? new Date(raw.hearts_last_refilled_at).getTime()
@@ -47,19 +47,36 @@ export function useHearts() {
 
   const loseHeartMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !raw) return;
-      const newHearts = Math.max(0, (raw.hearts ?? 5) - 1);
-      const { error } = await supabase
-        .from("learning_user_streaks")
-        .update({
-          hearts: newHearts,
-          hearts_last_refilled_at:
-            newHearts < (raw.max_hearts ?? 5) && raw.hearts === raw.max_hearts
-              ? new Date().toISOString()
-              : raw.hearts_last_refilled_at,
-        })
-        .eq("user_id", user.id);
-      if (error) throw error;
+      if (!user) return;
+
+      const currentHearts = computed.hearts;
+      const maxH = computed.maxHearts;
+      const newHearts = Math.max(0, currentHearts - 1);
+
+      if (!raw) {
+        // No row exists yet — upsert with hearts already decremented
+        const { error } = await supabase
+          .from("learning_user_streaks")
+          .insert({
+            user_id: user.id,
+            hearts: newHearts,
+            max_hearts: DEFAULT_MAX_HEARTS,
+            hearts_last_refilled_at: new Date().toISOString(),
+          });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("learning_user_streaks")
+          .update({
+            hearts: newHearts,
+            hearts_last_refilled_at:
+              currentHearts === maxH
+                ? new Date().toISOString()
+                : raw.hearts_last_refilled_at,
+          })
+          .eq("user_id", user.id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-hearts"] }),
   });
@@ -67,7 +84,7 @@ export function useHearts() {
   const gainHeartMutation = useMutation({
     mutationFn: async () => {
       if (!user || !raw) return;
-      const newHearts = Math.min((raw.hearts ?? 0) + 1, raw.max_hearts ?? 5);
+      const newHearts = Math.min((raw.hearts ?? 0) + 1, raw.max_hearts ?? DEFAULT_MAX_HEARTS);
       const { error } = await supabase
         .from("learning_user_streaks")
         .update({ hearts: newHearts })
