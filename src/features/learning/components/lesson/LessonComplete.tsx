@@ -44,9 +44,11 @@ export function LessonComplete({
       </div>
 
       <h2 className="font-bangers text-3xl text-foreground tracking-wide mb-2">
-        {t("learn.lessonComplete")}
+        {isReview ? t("learn.lessonReheated") : t("learn.lessonComplete")}
       </h2>
-      <p className="text-muted-foreground font-inter mb-4">{t("learn.greatJob")}</p>
+      <p className="text-muted-foreground font-inter mb-4">
+        {isReview ? t("learn.skillsReheated") : t("learn.greatJob")}
+      </p>
 
       <div className="relative mb-2">
         <XPCounter xp={xpEarned} className="mb-2" />
