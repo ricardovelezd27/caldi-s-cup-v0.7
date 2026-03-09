@@ -14,6 +14,9 @@ import { StreakDisplay } from "@/features/learning/components/gamification/Strea
 import { DailyGoalRing } from "@/features/learning/components/gamification/DailyGoalRing";
 import { useStreak } from "@/hooks/gamification/useStreak";
 import { useDailyGoal } from "@/features/learning/hooks/useDailyGoal";
+import { useFavorites } from "@/features/coffee/hooks/useFavorites";
+import { useInventory } from "@/features/coffee/hooks/useInventory";
+import { Heart, Package } from "lucide-react";
 import caldiLogo from "/lovable-uploads/8e78a6bd-5f00-45be-b082-c35b57fa9a7c.png";
 
 export function ProfileHero() {
@@ -25,6 +28,8 @@ export function ProfileHero() {
 
   const { streak } = useStreak();
   const { goal } = useDailyGoal();
+  const { favoriteIds } = useFavorites();
+  const { inventoryItems } = useInventory();
 
   if (!user || !profile) return null;
 
@@ -149,9 +154,17 @@ export function ProfileHero() {
 
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mt-2">
                   <ProfileRankRow />
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
                     {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+                      <Heart className="h-3.5 w-3.5" />
+                      {favoriteIds.length}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                      <Package className="h-3.5 w-3.5" />
+                      {inventoryItems.length}
+                    </span>
                   </div>
                 </div>
               </div>
