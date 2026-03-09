@@ -9,7 +9,6 @@ import { ImageIdentification } from "../exercises/knowledge/ImageIdentification"
 import { Categorization } from "../exercises/knowledge/Categorization";
 import { Troubleshooting } from "../exercises/applied/Troubleshooting";
 import { RecipeBuilding } from "../exercises/applied/RecipeBuilding";
-import { Calculation } from "../exercises/applied/Calculation";
 import { Prediction } from "../exercises/applied/Prediction";
 import { Comparison } from "../exercises/applied/Comparison";
 
