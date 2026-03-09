@@ -3,10 +3,11 @@ import { Lock, Check, Circle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import type { TrackPathSection, TrackPathLesson } from "../../hooks/useTrackPath";
+import type { LearningUserProgress } from "../../types";
 
 interface TrackPathViewProps {
   sections: TrackPathSection[];
-  progressMap: Set<string>;
+  progressMap: Map<string, LearningUserProgress>;
   trackId: string;
 }
 
