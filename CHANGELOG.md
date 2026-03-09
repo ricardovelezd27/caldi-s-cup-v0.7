@@ -4,6 +4,26 @@ All notable changes to Caldi's Cup are documented here.
 
 ---
 
+## [2.1.0] - 2026-03-09 - Lesson Exercise UI Polish (Phase L6)
+
+### Added
+- **Centered Feedback Modal**: Replaced bottom action bar with a `Dialog`-based `FeedbackModal` showing correct/incorrect status, mascot dialogues, and explanations
+- **Exercise Error Reporting**: New `exercise_error_reports` table and `ReportExerciseErrorDialog` component — users can flag mistakes directly from the feedback modal
+- **Persistent Layout During Exercises**: Exercises now wrapped in `PageLayout` so header/footer remain visible throughout lessons
+
+### Fixed
+- **Hearts System Bug**: `loseHeart` now upserts a `learning_user_streaks` row on first wrong answer instead of silently failing when no row exists
+- **Hearts Refill Interval**: Changed from 4 hours to 24 hours (daily replenishment)
+- **Lesson Results Screen**: Removed duplicate back navigation; ensured "Back to Track" button properly navigates after XP processing
+- **BottomActionBar Positioning**: Changed from `fixed` to `sticky` so it sits above the footer instead of overlapping it
+
+### Changed
+- `LessonScreen.tsx`: Refactored exercise/feedback rendering to use `FeedbackModal` and `PageLayout`
+- `useHearts.ts`: Upsert logic on first heart loss, 24h refill interval
+- i18n dictionaries: Added ~10 keys for report error UI (EN/ES)
+
+---
+
 ## [2.0.0] - 2026-02-26 - Learning Module Complete (Phases L1-L5)
 
 ### Added
