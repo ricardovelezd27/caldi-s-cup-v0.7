@@ -26,6 +26,11 @@ export function validateUnitJson(raw: string): ValidationResult {
 
   // Business-rule warnings (non-blocking)
   for (const [li, lesson] of unit.lessons.entries()) {
+    for (const [ei, ex] of lesson.exercises.entries()) {
+      if (ex.type === "calculation") {
+        warnings.push(`Lesson ${li + 1}, Exercise ${ei + 1}: "calculation" type is deprecated and will be ignored`);
+      }
+    }
     if (lesson.exercises.length < 5) {
       warnings.push(`Lesson ${li + 1} "${lesson.name}" has only ${lesson.exercises.length} exercises (recommended ≥ 5)`);
     }

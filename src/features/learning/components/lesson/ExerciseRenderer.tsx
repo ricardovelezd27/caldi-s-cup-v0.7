@@ -44,8 +44,6 @@ export function ExerciseRenderer({ exercise, onAnswer, disabled }: ExerciseRende
       return <Troubleshooting data={qd} onSubmit={handleSubmit} disabled={disabled} />;
     case "recipe_building":
       return <RecipeBuilding data={qd} onSubmit={handleSubmit} disabled={disabled} />;
-    case "calculation":
-      return <Calculation data={qd} onSubmit={handleSubmit} disabled={disabled} />;
     case "prediction":
       return <Prediction data={qd} onSubmit={handleSubmit} disabled={disabled} />;
     case "comparison":
