@@ -15,6 +15,9 @@ import {
   FillInBlankForm,
   MatchingPairsForm,
   SequencingForm,
+  PredictionForm,
+  TroubleshootingForm,
+  CategorizationForm,
   GenericJsonForm,
 } from "./exercise-forms";
 
