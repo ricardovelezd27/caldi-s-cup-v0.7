@@ -19,7 +19,7 @@ import { LessonIntro } from "./LessonIntro";
 import { LessonProgress } from "./LessonProgress";
 import { LessonComplete } from "./LessonComplete";
 import { ExerciseRenderer } from "./ExerciseRenderer";
-import { BottomActionBar } from "../exercises/base/BottomActionBar";
+import { FeedbackModal } from "./FeedbackModal";
 import { SignupPrompt } from "../gamification/SignupPrompt";
 import { HeartsEmptyModal } from "../gamification/HeartsEmptyModal";
 import { AchievementUnlock } from "../gamification/AchievementUnlock";
