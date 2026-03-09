@@ -1,81 +1,43 @@
 
 
-# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
+# Plan: User Ranks and Titles (Gamification Phase 2)
 
-## Root Cause
+## 1. Create Rank Configuration (`src/features/gamification/config/ranks.ts`)
 
-Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
+Define an ordered array of rank objects:
 
-```typescript
-const allText = JSON.stringify(sanitizedData).toLowerCase();
-```
+| Rank | Min XP | Icon | Color Class |
+|------|--------|------|-------------|
+| Novice | 0 | 📄 | text-slate-400 |
+| Green Apron | 100 | 🎽 | text-emerald-500 |
+| Bronze Tamper | 500 | 🤎 | text-amber-700 |
+| Silver Pitcher | 1500 | 🤍 | text-slate-300 |
+| Gold Portafilter | 3000 | 💛 | text-yellow-500 |
+| Coffee Master | 5000 | 🖤 | text-stone-900 |
 
-When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
+Each object: `{ id, name, minXP, icon, colorClass }`. TypeScript interface exported for reuse.
 
-## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
+## 2. Create Rank Hook (`src/features/gamification/hooks/useUserRank.ts`)
 
-### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
+Reads `profile.total_xp` from `useAuth()` and returns:
+- **currentRank**: highest rank where `total_xp >= minXP`
+- **nextRank**: next rank in the array, or `null` if Coffee Master
+- **progressToNext**: `((totalXP - currentRank.minXP) / (nextRank.minXP - currentRank.minXP)) * 100`, clamped 0–100
+- **xpNeeded**: `nextRank.minXP - totalXP`, or `0` if maxed
 
-Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+Pure calculation — no database calls needed since `total_xp` is already on the profile.
 
-- `coffeeName`, `brand`
-- `variety`, `processingMethod`
-- `legacyRoastLevel` (text roast descriptor)
-- `originCountry`, `originRegion`, `originFarm`
-- `flavorNotes` (joined)
+## 3. Index Barrel (`src/features/gamification/index.ts`)
 
-**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
+Export both the config and hook for clean imports.
 
-```typescript
-// Build search text from ONLY the coffee's actual attributes
-const attributeText = [
-  sanitizedData.coffeeName,
-  sanitizedData.brand,
-  sanitizedData.variety,
-  sanitizedData.processingMethod,
-  sanitizedData.legacyRoastLevel,
-  sanitizedData.originCountry,
-  sanitizedData.originRegion,
-  sanitizedData.originFarm,
-  ...sanitizedData.flavorNotes,
-].filter(Boolean).join(" ").toLowerCase();
-```
+## Files
 
-### 2. Strengthen the tribe context in the prompt (line 384-386)
+| File | Action |
+|------|--------|
+| `src/features/gamification/config/ranks.ts` | **Create** |
+| `src/features/gamification/hooks/useUserRank.ts` | **Create** |
+| `src/features/gamification/index.ts` | **Create** |
 
-Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
-
-**Before:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-Consider these when calculating the tribe match score.
-```
-
-**After:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
-variety, processing method, roast level, origin, and flavor notes.
-Do NOT let references to other varietals or methods in jargon explanations
-influence the match assessment. For example, if the variety is "Caturra",
-do not count "Bourbon" as a match just because Caturra descends from Bourbon.
-```
-
-### 3. No model change
-
-Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
-
-## Impact
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
-| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
-| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
-
-Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
-
-## Implementation
-
-Single file edit with 2 changes, auto-deploys as edge function.
+No database changes required.
 
