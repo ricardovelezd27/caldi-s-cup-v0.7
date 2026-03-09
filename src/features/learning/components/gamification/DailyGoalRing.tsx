@@ -1,51 +1,38 @@
-import { useLanguage } from "@/contexts/language";
+import { cn } from "@/lib/utils";
+import { Target } from "lucide-react";
 
 interface DailyGoalRingProps {
   earnedXp: number;
   goalXp: number;
-  size?: number;
+  size?: "sm" | "md";
+  className?: string;
 }
 
-export function DailyGoalRing({ earnedXp, goalXp, size = 56 }: DailyGoalRingProps) {
-  const { t } = useLanguage();
-  const percent = goalXp > 0 ? Math.min((earnedXp / goalXp) * 100, 100) : 0;
-  const achieved = percent >= 100;
-  const radius = (size - 8) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percent / 100) * circumference;
+export function DailyGoalRing({ earnedXp, goalXp, size = "md", className }: DailyGoalRingProps) {
+  const achieved = goalXp > 0 && earnedXp >= goalXp;
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="hsl(var(--border))"
-            strokeWidth={4}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={achieved ? "hsl(var(--primary))" : "hsl(var(--secondary))"}
-            strokeWidth={4}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            className="transition-all duration-700 ease-out"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[10px] font-inter font-bold text-foreground">
-            {earnedXp}/{goalXp}
-          </span>
-        </div>
-      </div>
-      <span className="text-xs font-inter text-muted-foreground">{t("learn.dailyGoal")}</span>
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 border-border bg-card shadow-[2px_2px_0px_0px_hsl(var(--border))]",
+        achieved && "border-primary",
+        className,
+      )}
+    >
+      <Target
+        className={cn(
+          size === "sm" ? "h-4 w-4" : "h-5 w-5",
+          achieved ? "text-primary" : "text-secondary",
+        )}
+      />
+      <span
+        className={cn(
+          "font-bangers tracking-wide text-foreground",
+          size === "sm" ? "text-sm" : "text-lg",
+        )}
+      >
+        {earnedXp}/{goalXp}
+      </span>
     </div>
   );
 }
