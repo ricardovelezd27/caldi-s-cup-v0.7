@@ -575,6 +575,7 @@ export const en = {
     baseXP: "Base XP",
     bonusXP: "Bonus XP",
     perfectBonus: "Perfect Lesson",
+    reviewBonus: "Review Bonus",
     speedBonus: "Speed Bonus",
     streakBonus: "Streak Bonus",
     firstOfDayBonus: "First of Day",
