@@ -108,10 +108,6 @@ export function ProfileHero() {
 
   const hasCoverImage = !!profile.cover_url;
 
-  // Get translated tribe name/title
-  const tribeName = tribe ? t(`tribes.${tribe}.name`) : null;
-  const tribeTitle = tribe ? t(`tribes.${tribe}.title`) : null;
-
   return (
     <div className="md:hidden w-full">
       {/* Cover gradient with SVG pattern or custom image */}
