@@ -89,6 +89,7 @@ export default function ImportUnitModal({ open, onClose, sectionId, existingUnit
     setRawJson("");
     setValidation(null);
     setPublishResult(null);
+    setOverrideMode(false);
     onClose();
   };
 
