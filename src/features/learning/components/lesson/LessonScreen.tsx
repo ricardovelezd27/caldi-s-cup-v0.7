@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useLesson } from "../../hooks/useLesson";
 import { useAuth } from "@/contexts/auth";
 import { useAnonymousProgress } from "../../hooks/useAnonymousProgress";
