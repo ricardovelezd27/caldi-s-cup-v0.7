@@ -8,6 +8,10 @@ import { ProfileAvatar, ProfileHero, ProfileInfoForm, ProfileRankRow, ChangePass
 import { Separator } from "@/components/ui/separator";
 import { FeedbackCTA } from "@/components/shared/FeedbackCTA";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { StreakDisplay } from "@/features/learning/components/gamification/StreakDisplay";
+import { DailyGoalRing } from "@/features/learning/components/gamification/DailyGoalRing";
+import { useStreak } from "@/hooks/gamification/useStreak";
+import { useDailyGoal } from "@/features/learning/hooks/useDailyGoal";
 
 function ProfileContent() {
   const { user, profile, refreshProfile } = useAuth();
