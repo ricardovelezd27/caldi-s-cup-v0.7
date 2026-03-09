@@ -26,6 +26,7 @@ export function LessonComplete({
   onNext,
   onBackToTrack,
   isProcessing,
+  isReview,
 }: LessonCompleteProps) {
   const { t } = useLanguage();
   const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
