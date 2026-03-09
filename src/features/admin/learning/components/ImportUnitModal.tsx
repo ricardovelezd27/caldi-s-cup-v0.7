@@ -8,7 +8,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, CheckCircle, Upload } from "lucide-react";
 import { validateUnitJson } from "../services/contentValidator";
 import { transformUnitForDb } from "../services/contentTransformer";
-import { upsertUnit, upsertLesson, upsertExercise } from "../services/adminLearningService";
+import { upsertUnit, upsertLesson, upsertExercise, getAdminLessons, deleteExercisesByLessonId, deleteEntity } from "../services/adminLearningService";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import type { ImportUnit, ValidationResult } from "../types/adminTypes";
 import { useQueryClient } from "@tanstack/react-query";
 
