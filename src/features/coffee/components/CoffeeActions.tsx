@@ -44,19 +44,19 @@ export function CoffeeActions({ coffee, scanMeta, onScanAgain }: CoffeeActionsPr
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
-        <Button variant={coffeeIsFavorite ? "secondary" : "outline"} onClick={handleToggleFavorite} disabled={isAddingFavorite || isRemovingFavorite} className="flex-1 min-w-[140px]">
+      <div className="grid grid-cols-2 gap-3">
+        <Button variant={coffeeIsFavorite ? "secondary" : "outline"} onClick={handleToggleFavorite} disabled={isAddingFavorite || isRemovingFavorite}>
           {(isAddingFavorite || isRemovingFavorite) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : coffeeIsFavorite ? <Heart className="h-4 w-4 mr-2 fill-current" /> : <Heart className="h-4 w-4 mr-2" />}
           {coffeeIsFavorite ? t('coffee.favorited') : t('coffee.addToFavorites')}
         </Button>
-        <Button variant={coffeeInInventory ? "secondary" : "outline"} onClick={handleAddToInventory} disabled={isAddingInventory || coffeeInInventory} className="flex-1 min-w-[140px]">
+        <Button variant={coffeeInInventory ? "secondary" : "outline"} onClick={handleAddToInventory} disabled={isAddingInventory || coffeeInInventory}>
           {isAddingInventory ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : coffeeInInventory ? <Check className="h-4 w-4 mr-2" /> : <Package className="h-4 w-4 mr-2" />}
           {coffeeInInventory ? t('coffee.inInventory') : t('coffee.addToInventory')}
         </Button>
-      </div>
-      <div className="flex flex-wrap gap-3">
-        {onScanAgain && (<Button variant="outline" onClick={onScanAgain} className="flex-1"><ScanLine className="h-4 w-4 mr-2" />{t('coffee.scanAnother')}</Button>)}
+        {onScanAgain && (<Button variant="outline" onClick={onScanAgain}><ScanLine className="h-4 w-4 mr-2" />{t('coffee.scanAnother')}</Button>)}
         <ReportScanErrorDialog coffee={coffee} scanMeta={scanMeta} />
+      </div>
+      <div className="flex justify-center">
         <Button variant="ghost" onClick={handleShare} size="icon"><Share2 className="h-4 w-4" /></Button>
       </div>
     </div>

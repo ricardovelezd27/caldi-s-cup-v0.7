@@ -155,7 +155,7 @@ export function ScanUploader({ onImagesReady, disabled }: ScanUploaderProps) {
           {t('scanner.photosAdded').replace('{{count}}', String(images.length))}
         </p>
 
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-wrap gap-3 justify-center">
           <Button onClick={handleScanNow} disabled={disabled} className="gap-2">
             <ScanLine className="h-4 w-4" />
             {t('scanner.scanNow')}
@@ -192,7 +192,7 @@ export function ScanUploader({ onImagesReady, disabled }: ScanUploaderProps) {
   return (
     <>
       <div
-        className={`border-4 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`border-4 border-dashed rounded-lg p-4 sm:p-8 text-center transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={disabled ? undefined : handleDrop}
       >
         <input ref={fileInputRef} type="file" accept={ACCEPTED_TYPES.join(",")} onChange={handleFileChange} className="hidden" disabled={disabled} />
@@ -205,7 +205,7 @@ export function ScanUploader({ onImagesReady, disabled }: ScanUploaderProps) {
             <h3 className="font-bangers text-2xl text-foreground mb-1">{t('scanner.scanBag')}</h3>
             <p className="text-muted-foreground text-sm">{t('scanner.addUpTo4')}</p>
           </div>
-          <div className="flex gap-3 mt-2">
+          <div className="flex flex-wrap gap-3 mt-2 justify-center">
             {isMobile && (
               <Button variant="default" onClick={handleCameraClick} disabled={disabled} className="gap-2">
                 <Camera className="w-4 h-4" />{t('scanner.takePhoto')}

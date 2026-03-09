@@ -1,63 +1,81 @@
 
 
-# Fix: Scanner and Coffee Profile UI Issues on Small Screens
+# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
 
-## Issues Identified
+## Root Cause
 
-### 1. Scanner Upload Zone Overflow (Pictures 1 & 2)
-**Root cause**: The upload zone uses `p-8` padding and buttons in a `flex gap-3` without wrapping. On small iPhones, the content overflows the dashed border area.
+Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
 
-**Fix in `ScanUploader.tsx`**:
-- Reduce inner padding from `p-8` to `p-4 sm:p-8` on the empty-state upload zone (line 195)
-- Add `flex-wrap` to the button container (line 208) so buttons stack on narrow screens
-- For the "has images" state (line 158), add `flex-wrap` to the CTA buttons container
+```typescript
+const allText = JSON.stringify(sanitizedData).toLowerCase();
+```
 
-### 2. Duplicate Progress Message (Picture 3)
-**Root cause**: `ScanProgress.tsx` displays `progress.message` twice:
-1. Line 34: Under the progress bar as `<p>{progress.message}</p>`
-2. Line 52: In the yellow animated section as `<span>{progress.message}</span>`
+When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
 
-**Fix in `ScanProgress.tsx`**: Remove the `<p>` on line 34 (the one under the progress bar). Keep only the animated yellow one.
+## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
 
-### 3. Progress Messages Not Translated (Picture 3)
-**Root cause**: `SCAN_PROGRESS_STATES` in `scanner.ts` (lines 70-77) has hardcoded English strings like `"AI is analyzing your coffee bag..."`. These are NOT using i18n keys.
+### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
 
-**Fix in `ScanProgress.tsx`**: Instead of displaying `progress.message` directly, map each `progress.status` to a translated string using the `t()` function. Add new i18n keys for the progress messages:
-- `scanner.progressUploading`: "Uploading image..." / "Subiendo imagen..."
-- `scanner.progressAnalyzing`: "AI is analyzing your coffee bag (this may take 20-30 seconds)..." / "La IA está analizando tu bolsa de café (esto puede tomar 20-30 segundos)..."
-- `scanner.progressEnriching`: "Almost done! Saving results..." / "¡Casi listo! Guardando resultados..."
-- `scanner.progressComplete`: "Scan complete!" / "¡Escaneo completo!"
+Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
 
-### 4. "Sign in to save this image" Not Translated (Picture 4)
-**Root cause**: `CoffeeImage.tsx` lines 32-33 have hardcoded English: `"Sign in"` and `"to save this image to your collection"`.
+- `coffeeName`, `brand`
+- `variety`, `processingMethod`
+- `legacyRoastLevel` (text roast descriptor)
+- `originCountry`, `originRegion`, `originFarm`
+- `flavorNotes` (joined)
 
-**Fix**: Replace with `t()` calls. Add new i18n keys:
-- `coffee.signInLink`: "Sign in" / "Inicia sesión"
-- `coffee.saveImageToCollection`: "to save this image to your collection" / "para guardar esta imagen en tu colección"
+**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
 
-### 5. CTA Layout Not Consistent — Force 2x2 Grid (Pictures 5 & 6)
-**Root cause**: `CoffeeActions.tsx` uses `flex flex-wrap gap-3` with `min-w-[140px]` which renders inconsistently across screen sizes.
+```typescript
+// Build search text from ONLY the coffee's actual attributes
+const attributeText = [
+  sanitizedData.coffeeName,
+  sanitizedData.brand,
+  sanitizedData.variety,
+  sanitizedData.processingMethod,
+  sanitizedData.legacyRoastLevel,
+  sanitizedData.originCountry,
+  sanitizedData.originRegion,
+  sanitizedData.originFarm,
+  ...sanitizedData.flavorNotes,
+].filter(Boolean).join(" ").toLowerCase();
+```
 
-**Fix in `CoffeeActions.tsx`**: Replace the two `<div className="flex flex-wrap gap-3">` containers with a single `grid grid-cols-2 gap-3` layout. Place all 4 buttons (Favorites, Inventory, Scan Another, Report Error) in the 2x2 grid. Move the Share button outside the grid or into one of the cells.
+### 2. Strengthen the tribe context in the prompt (line 384-386)
 
-### 6. Jargon Buster Translation Issue (Picture 7)
-**Root cause**: Looking at Picture 7, the section title `t('coffee.jargonBuster')` translates correctly ("Traductor de Jerga"). The issue is likely that the **jargon explanation content** comes from the AI in English and is not translated. Since jargon content is AI-generated (dynamic), we cannot translate the body text via i18n. However, I need to check if there's a label or heading that's wrong. 
+Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
 
-Looking more carefully — the `CoffeeJargonBuster` uses `t('coffee.jargonBuster')` which maps to "Traductor de Jerga" in Spanish. The jargon **terms** (keys from `jargonExplanations`) are displayed with `capitalize` styling. If the user is seeing English labels, it could be that the term keys themselves are in English from the AI. Since these are dynamic AI-generated content, they are excluded from translation per project constraints. 
+**Before:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+Consider these when calculating the tribe match score.
+```
 
-However, the user explicitly says "there is another translation mistake." Let me check if there's a missing or wrong key. The `jargonBuster` key exists in both files. Perhaps the issue is that the component heading itself doesn't render the translated version due to a bug — I'll need to verify. Given the user says it's a translation mistake, I'll ensure the key mapping is correct and add any missing pieces.
+**After:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
+variety, processing method, roast level, origin, and flavor notes.
+Do NOT let references to other varietals or methods in jargon explanations
+influence the match assessment. For example, if the variety is "Caturra",
+do not count "Bourbon" as a match just because Caturra descends from Bourbon.
+```
 
-## Summary of File Changes
+### 3. No model change
 
-| File | Changes |
-|------|---------|
-| `ScanUploader.tsx` | Reduce padding, add `flex-wrap` to button containers |
-| `ScanProgress.tsx` | Remove duplicate message under progress bar; use translated status messages |
-| `CoffeeImage.tsx` | Replace hardcoded English text with i18n keys |
-| `CoffeeActions.tsx` | Switch from `flex flex-wrap` to `grid grid-cols-2` for consistent 2x2 layout |
-| `scanner.ts` | No changes needed (messages will be overridden in component) |
-| `en.ts` | Add new keys: `progressUploading`, `progressAnalyzing`, `progressEnriching`, `progressComplete`, `coffee.signInLink`, `coffee.saveImageToCollection` |
-| `es.ts` | Add same keys with Spanish translations |
+Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
 
-7 files, all frontend. No backend changes.
+## Impact
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
+| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
+| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
+
+Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
+
+## Implementation
+
+Single file edit with 2 changes, auto-deploys as edge function.
 

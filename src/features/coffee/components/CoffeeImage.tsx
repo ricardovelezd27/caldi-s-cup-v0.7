@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/language";
 
 interface CoffeeImageProps {
   src: string | null;
@@ -10,6 +11,7 @@ interface CoffeeImageProps {
 }
 
 export function CoffeeImage({ src, alt, className, isTemporaryImage, additionalImages }: CoffeeImageProps) {
+  const { t } = useLanguage();
   const galleryImages = additionalImages && additionalImages.length > 0 ? additionalImages : null;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const mainSrc = galleryImages ? galleryImages[selectedIndex] : src;
@@ -29,8 +31,8 @@ export function CoffeeImage({ src, alt, className, isTemporaryImage, additionalI
             {isTemporaryImage && (
               <div className="absolute bottom-0 inset-x-0 bg-foreground/80 px-3 py-2 text-center">
                 <p className="text-background text-sm font-medium">
-                  <a href="/auth" className="underline text-primary font-bold">Sign in</a>
-                  {" "}to save this image to your collection
+                  <a href="/auth" className="underline text-primary font-bold">{t('coffee.signInLink')}</a>
+                  {" "}{t('coffee.saveImageToCollection')}
                 </p>
               </div>
             )}

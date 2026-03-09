@@ -27,11 +27,20 @@ export function ScanProgress({ progress }: ScanProgressProps) {
 
   const isError = progress.status === "error";
 
+  const getProgressMessage = () => {
+    switch (progress.status) {
+      case "uploading": return t('scanner.progressUploading');
+      case "analyzing": return t('scanner.progressAnalyzing');
+      case "enriching": return t('scanner.progressEnriching');
+      case "complete": return t('scanner.progressComplete');
+      default: return progress.message;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <Progress value={progress.progress} className="h-3 border-2 border-border" />
-        <p className="text-center text-sm text-muted-foreground">{progress.message}</p>
       </div>
       <div className="flex justify-between">
         {steps.map((step, index) => {
@@ -49,7 +58,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
       </div>
       {!isError && progress.status !== "complete" && progress.status !== "idle" && (
         <div className="flex flex-col items-center gap-2">
-          <div className="flex items-center justify-center gap-2 text-primary"><Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm font-medium animate-pulse">{progress.message}</span></div>
+          <div className="flex items-center justify-center gap-2 text-primary"><Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm font-medium animate-pulse">{getProgressMessage()}</span></div>
           {(progress.status === "analyzing" || progress.status === "enriching") && (
             <div className="flex items-center gap-1.5 text-muted-foreground"><Clock className="w-3.5 h-3.5" /><span className="text-xs font-medium">{t('scanner.timeElapsed')}: {elapsedTime}s</span></div>
           )}
