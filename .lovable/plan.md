@@ -1,77 +1,81 @@
 
 
-# Plan: Desktop Track Page Redesign + Lesson Intro/Complete Overhaul
+# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
 
-## Part 1: Track Page — Fill the Desktop Space
+## Root Cause
 
-**Problem**: Content is constrained to `max-w-2xl` (672px) leaving huge empty margins on desktop.
+Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
 
-### TrackPage.tsx
-- Widen container from `max-w-2xl` to `max-w-5xl` on desktop
-- Add a 2-column layout on desktop: left column = track path content (~60%), right column = sticky sidebar with mascot illustration + track stats card
-- Sidebar shows `ilustration_Duo_and_Goat_NoBG_1.png` mascot duo + a stats card (lessons completed, total XP available, estimated time remaining)
-- Mobile stays single-column (sidebar hidden on mobile)
-
-### TrackPathView.tsx
-- On desktop, render sections in a wider layout with more breathing room
-- Unit cards get a subtle card background (`bg-card border-2 border-border rounded-xl p-4 shadow-[4px_4px_0px_0px_hsl(var(--border))]`) on desktop instead of bare list items
-- Lesson nodes get slightly more padding and hover effects on desktop
-
-### Layout structure on desktop:
-```text
-┌──────────────────────────────────────────────────────┐
-│  ← Back to Track                                     │
-│  🧪 BREWING SCIENCE          [Progress Bar 33%]      │
-├────────────────────────────┬─────────────────────────┤
-│                            │                         │
-│  BEGINNER                  │  ┌───────────────────┐  │
-│  EXTRACTION FUNDAMENTALS   │  │  [Caldi & Goat]   │  │
-│  🎯 Goal description       │  │   illustration    │  │
-│                            │  │                   │  │
-│  ┌─────────────────────┐   │  └───────────────────┘  │
-│  │ The Alchemy of Bean │   │                         │
-│  │  ✓ Solubility       │   │  ┌───────────────────┐  │
-│  │  ✓ TDS & Strength   │   │  │ Track Stats       │  │
-│  │  ✓ Brewing Chart    │   │  │ 9 lessons · 36min │  │
-│  └─────────────────────┘   │  │ 150 XP available  │  │
-│                            │  └───────────────────┘  │
-│  ┌─────────────────────┐   │                         │
-│  │ Extraction Timeline │   │                         │
-│  │  ...                │   │                         │
-│  └─────────────────────┘   │                         │
-└────────────────────────────┴─────────────────────────┘
+```typescript
+const allText = JSON.stringify(sanitizedData).toLowerCase();
 ```
 
-## Part 2: Lesson Intro — Premium Treatment
+When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
 
-**Problem**: The intro screen ignores the page layout (no header/footer, no back button). It looks disconnected.
+## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
 
-### LessonPage.tsx
-- Wrap `LessonScreen` in `PageLayout` so header and footer are always visible
-- Add a back link at the top (← Back to Track) before lesson content
+### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
 
-### LessonIntro (inside LessonScreen.tsx)
-- Keep the intro within the `PageLayout` flow (not a full-screen takeover)
-- Add lesson name display from `lesson.name` (currently not passed)
-- Constrain to `max-w-2xl mx-auto` with proper padding
-- Keep the mascot, dialogue bubble, time/XP pills, and Start button as-is (they already look good per screenshot)
+Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
 
-### LessonComplete
-- Also render inside `PageLayout` flow (header/footer visible)
-- Add a back navigation option
+- `coffeeName`, `brand`
+- `variety`, `processingMethod`
+- `legacyRoastLevel` (text roast descriptor)
+- `originCountry`, `originRegion`, `originFarm`
+- `flavorNotes` (joined)
 
-### LessonScreen.tsx
-- Pass `lesson.name` and `lesson.introText` to `LessonIntro`
-- The exercise state already has `min-h-[100dvh]` — keep that for immersive exercise flow, but intro and complete states render within the normal page layout
-- Restructure: intro and complete states DON'T use `min-h-[100dvh]` (they live inside PageLayout). Only the exercise state goes immersive.
+**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
 
-## Files Changed
+```typescript
+// Build search text from ONLY the coffee's actual attributes
+const attributeText = [
+  sanitizedData.coffeeName,
+  sanitizedData.brand,
+  sanitizedData.variety,
+  sanitizedData.processingMethod,
+  sanitizedData.legacyRoastLevel,
+  sanitizedData.originCountry,
+  sanitizedData.originRegion,
+  sanitizedData.originFarm,
+  ...sanitizedData.flavorNotes,
+].filter(Boolean).join(" ").toLowerCase();
+```
 
-| File | Action |
-|------|--------|
-| `TrackPage.tsx` | Edit — widen to `max-w-5xl`, add 2-col desktop layout with sidebar |
-| `TrackPathView.tsx` | Edit — unit cards with backgrounds on desktop |
-| `LessonPage.tsx` | Edit — wrap in `PageLayout`, add back link |
-| `LessonScreen.tsx` | Edit — pass lesson metadata to intro, restructure layout states |
-| `LessonIntro.tsx` | Edit — add back button prop, lesson name |
+### 2. Strengthen the tribe context in the prompt (line 384-386)
+
+Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
+
+**Before:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+Consider these when calculating the tribe match score.
+```
+
+**After:**
+```
+The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
+IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
+variety, processing method, roast level, origin, and flavor notes.
+Do NOT let references to other varietals or methods in jargon explanations
+influence the match assessment. For example, if the variety is "Caturra",
+do not count "Bourbon" as a match just because Caturra descends from Bourbon.
+```
+
+### 3. No model change
+
+Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
+
+## Impact
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
+| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
+| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
+
+Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
+
+## Implementation
+
+Single file edit with 2 changes, auto-deploys as edge function.
 

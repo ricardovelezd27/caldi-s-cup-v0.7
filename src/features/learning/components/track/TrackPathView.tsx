@@ -35,13 +35,14 @@ function LessonNode({ lesson, trackId, language }: { lesson: TrackPathLesson; tr
 
   const nodeContent = (
     <div className={cn(
-      "flex items-center gap-3 py-2 group",
+      "flex items-center gap-3 py-3 px-3 rounded-lg group transition-all duration-200",
       lesson.status === "locked" && "opacity-50",
-      (lesson.status === "available" || isDecayed) && "cursor-pointer",
+      (lesson.status === "available" || isDecayed) && "cursor-pointer hover:bg-primary/5",
+      lesson.status === "completed" && "hover:bg-secondary/5",
     )}>
       {/* Status circle */}
       <div className={cn(
-        "w-10 h-10 rounded-full border-4 flex items-center justify-center shrink-0 transition-all",
+        "w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
         lesson.status === "completed" && "bg-secondary border-secondary text-secondary-foreground",
         lesson.status === "available" && "border-primary bg-primary/10 animate-pulse",
         lesson.status === "locked" && "border-border bg-muted",
@@ -81,13 +82,13 @@ function LessonNode({ lesson, trackId, language }: { lesson: TrackPathLesson; tr
 
   if (lesson.status === "available" || isDecayed) {
     return (
-      <Link to={`/learn/${trackId}/${lesson.id}`} className="block hover:bg-accent/10 rounded-lg px-2 -mx-2 transition-colors">
+      <Link to={`/learn/${trackId}/${lesson.id}`} className="block">
         {nodeContent}
       </Link>
     );
   }
 
-  return <div className="px-2 -mx-2">{nodeContent}</div>;
+  return <div>{nodeContent}</div>;
 }
 
 export function TrackPathView({ sections, progressMap, trackId }: TrackPathViewProps) {
@@ -135,11 +136,14 @@ export function TrackPathView({ sections, progressMap, trackId }: TrackPathViewP
                 </p>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {section.units.map((unit) => {
                   const unitName = language === "es" ? unit.nameEs : unit.name;
                   return (
-                    <div key={unit.id} className="ml-2">
+                    <div
+                      key={unit.id}
+                      className="border-2 border-border rounded-xl bg-card p-4 md:p-5 shadow-[4px_4px_0px_0px_hsl(var(--border))]"
+                    >
                       {/* Unit header */}
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-lg">{unit.icon}</span>
@@ -152,7 +156,7 @@ export function TrackPathView({ sections, progressMap, trackId }: TrackPathViewP
                       </div>
 
                       {/* Lesson path */}
-                      <div className="ml-5 border-l-2 border-border pl-4 space-y-1">
+                      <div className="ml-1 border-l-2 border-border pl-3 space-y-0.5">
                         {unit.lessons.map((lesson) => (
                           <LessonNode
                             key={lesson.id}
