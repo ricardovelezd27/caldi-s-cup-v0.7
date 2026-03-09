@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/auth";
 import { LanguageProvider } from "@/contexts/language";
 import { ErrorBoundary, OfflineIndicator } from "@/components/error";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { RankUpProvider } from "@/features/gamification";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -45,10 +46,11 @@ const App = () => (
           <BrowserRouter>
             <ScrollToTop />
             <AuthProvider>
-              <OfflineIndicator />
-              <Toaster />
-              <Sonner />
-              <Routes>
+              <RankUpProvider>
+                <OfflineIndicator />
+                <Toaster />
+                <Sonner />
+                <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/quiz" element={<QuizPage />} />
@@ -75,7 +77,8 @@ const App = () => (
                 </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
-              </Routes>
+                </Routes>
+              </RankUpProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
