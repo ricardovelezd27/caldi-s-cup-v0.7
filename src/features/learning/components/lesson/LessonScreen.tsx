@@ -1,7 +1,10 @@
 import { useState, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLesson } from "../../hooks/useLesson";
 import { useAuth } from "@/contexts/auth";
+import { useLanguage } from "@/contexts/language";
 import { useAnonymousProgress } from "../../hooks/useAnonymousProgress";
 import { useHearts } from "../../hooks/useHearts";
 import { useStreak } from "../../hooks/useStreak";
@@ -11,6 +14,7 @@ import { calculateLessonXP } from "../../services/xpService";
 import { updateStreakViaRPC, addXPToDaily } from "../../services/streakService";
 import { addWeeklyXP } from "../../services/leagueService";
 import { upsertLessonProgress, getLessonProgress } from "../../services/progressService";
+import { PageLayout } from "@/components/layout";
 import { LessonIntro } from "./LessonIntro";
 import { LessonProgress } from "./LessonProgress";
 import { LessonComplete } from "./LessonComplete";
@@ -26,12 +30,14 @@ import type { LearningAchievement } from "../../types";
 interface LessonScreenProps {
   lessonId: string;
   trackId: string;
+  trackRoute: string;
   onExit: () => void;
   onComplete: () => void;
 }
 
-export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonScreenProps) {
+export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete }: LessonScreenProps) {
   const { user, refreshProfile } = useAuth();
+  const { t, language } = useLanguage();
   const lesson = useLesson(lessonId);
   const anonymousProgress = useAnonymousProgress();
   const { hearts, maxHearts, hasHearts, loseHeart, isLoading: heartsLoading } = useHearts();
@@ -50,12 +56,9 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
   const handleSubmitAnswer = useCallback(
     (answer: any, isCorrect: boolean) => {
       lesson.submitAnswer(isCorrect, answer);
-
       if (!isCorrect && user) {
         loseHeart().then(() => {
-          if (hearts <= 1) {
-            setShowHeartsEmpty(true);
-          }
+          if (hearts <= 1) setShowHeartsEmpty(true);
         });
       }
     },
@@ -109,10 +112,7 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
         .eq("id", user.id)
         .single();
       const newTotalXp = ((currentProfile as any)?.total_xp ?? 0) + xpCalc.totalXP;
-      await supabase
-        .from("profiles")
-        .update({ total_xp: newTotalXp })
-        .eq("id", user.id);
+      await supabase.from("profiles").update({ total_xp: newTotalXp }).eq("id", user.id);
 
       const scorePercent =
         lesson.score.total > 0
@@ -144,31 +144,57 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
       setIsProcessingComplete(false);
       refreshProfile();
     }
-  }, [
-    user,
-    lesson,
-    lessonId,
-    streak,
-    anonymousProgress,
-    onComplete,
-    addDailyXP,
-    checkAndUnlockAchievements,
-  ]);
+  }, [user, lesson, lessonId, streak, anonymousProgress, onComplete, addDailyXP, checkAndUnlockAchievements]);
 
+  // --- Back link component ---
+  const BackLink = () => (
+    <Link
+      to={trackRoute}
+      className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors font-inter text-sm"
+    >
+      <ArrowLeft className="w-4 h-4" />
+      {t("learn.backToTrack")}
+    </Link>
+  );
+
+  // --- LOADING ---
   if (lesson.state === "loading") {
     return (
-      <div className="p-8 space-y-4">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
+      <PageLayout>
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <BackLink />
+          <div className="mt-6 space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </PageLayout>
     );
   }
 
+  // --- INTRO ---
   if (lesson.state === "intro") {
-    return <LessonIntro onStart={lesson.startLesson} />;
+    const lessonData = lesson.lesson;
+    const lessonName = lessonData ? (language === "es" ? lessonData.nameEs : lessonData.name) : undefined;
+    const introText = lessonData ? (language === "es" ? lessonData.introTextEs : lessonData.introText) : undefined;
+
+    return (
+      <PageLayout>
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <BackLink />
+          <LessonIntro
+            lessonName={lessonName}
+            introText={introText}
+            estimatedMinutes={lessonData?.estimatedMinutes}
+            xpReward={lessonData?.xpReward}
+            onStart={lesson.startLesson}
+          />
+        </div>
+      </PageLayout>
+    );
   }
 
-  // Merged exercise + feedback state: exercise stays visible, feedback bar overlays
+  // --- EXERCISE + FEEDBACK (immersive) ---
   if ((lesson.state === "exercise" || lesson.state === "feedback") && lesson.currentExercise) {
     const isFeedback = lesson.state === "feedback";
     const feedbackQd = lesson.currentExercise?.questionData as any;
@@ -209,47 +235,57 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
     );
   }
 
+  // --- COMPLETE ---
   if (lesson.state === "complete") {
     return (
-      <>
-        <LessonComplete
-          correct={lesson.score.correct}
-          total={lesson.score.total}
-          xpEarned={xpResult?.totalXP ?? lesson.lesson?.xpReward ?? 10}
-          xpBreakdown={xpResult ?? undefined}
-          timeSpent={lesson.timeSpent}
-          onBackToTrack={handleLessonDone}
-          isProcessing={isProcessingComplete}
-          isReview={isReview}
-        />
-        <SignupPrompt
-          open={showSignup}
-          onOpenChange={setShowSignup}
-          onMaybeLater={() => {
-            anonymousProgress.dismissSignupPrompt();
-            setShowSignup(false);
-            onComplete();
-          }}
-          forceful={anonymousProgress.shouldForceSignup}
-        />
-        {showAchievement && (
-          <AchievementUnlock
-            achievement={showAchievement}
-            open={!!showAchievement}
-            onOpenChange={(open) => {
-              if (!open) {
-                const remaining = newAchievements.filter((a) => a.id !== showAchievement.id);
-                setShowAchievement(remaining[0] ?? null);
-                if (remaining.length === 0) {
-                  onComplete();
-                }
-              }
-            }}
+      <PageLayout>
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <BackLink />
+          <LessonComplete
+            correct={lesson.score.correct}
+            total={lesson.score.total}
+            xpEarned={xpResult?.totalXP ?? lesson.lesson?.xpReward ?? 10}
+            xpBreakdown={xpResult ?? undefined}
+            timeSpent={lesson.timeSpent}
+            onBackToTrack={handleLessonDone}
+            isProcessing={isProcessingComplete}
+            isReview={isReview}
           />
-        )}
-      </>
+          <SignupPrompt
+            open={showSignup}
+            onOpenChange={setShowSignup}
+            onMaybeLater={() => {
+              anonymousProgress.dismissSignupPrompt();
+              setShowSignup(false);
+              onComplete();
+            }}
+            forceful={anonymousProgress.shouldForceSignup}
+          />
+          {showAchievement && (
+            <AchievementUnlock
+              achievement={showAchievement}
+              open={!!showAchievement}
+              onOpenChange={(open) => {
+                if (!open) {
+                  const remaining = newAchievements.filter((a) => a.id !== showAchievement.id);
+                  setShowAchievement(remaining[0] ?? null);
+                  if (remaining.length === 0) onComplete();
+                }
+              }}
+            />
+          )}
+        </div>
+      </PageLayout>
     );
   }
 
-  return <LessonIntro onStart={lesson.startLesson} />;
+  // Fallback
+  return (
+    <PageLayout>
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <BackLink />
+        <LessonIntro onStart={lesson.startLesson} />
+      </div>
+    </PageLayout>
+  );
 }
