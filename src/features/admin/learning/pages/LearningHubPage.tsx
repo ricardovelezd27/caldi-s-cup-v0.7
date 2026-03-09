@@ -1,20 +1,32 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminTracks } from "../hooks/useAdminTracks";
 import { Switch } from "@/components/ui/switch";
-import { toggleActive } from "../services/adminLearningService";
+import { Button } from "@/components/ui/button";
+import { toggleActive, deleteEntity } from "../services/adminLearningService";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import AdminBreadcrumb from "../components/AdminBreadcrumb";
 
 export default function LearningHubPage() {
   const { data: tracks, isLoading } = useAdminTracks();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const handleToggle = async (id: string, current: boolean) => {
     await toggleActive("learning_tracks", id, !current);
     qc.invalidateQueries({ queryKey: ["admin", "tracks"] });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteEntity("learning_tracks", deleteTarget);
+    qc.invalidateQueries({ queryKey: ["admin", "tracks"] });
+    setDeleteTarget(null);
   };
 
   return (
@@ -34,6 +46,7 @@ export default function LearningHubPage() {
               <TableHead>Name</TableHead>
               <TableHead>Track ID</TableHead>
               <TableHead className="text-center">Active</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -52,11 +65,33 @@ export default function LearningHubPage() {
                     onCheckedChange={() => handleToggle(t.id, t.is_active)}
                   />
                 </TableCell>
+                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(t.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this track and all its nested content (sections, units, lessons, exercises).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

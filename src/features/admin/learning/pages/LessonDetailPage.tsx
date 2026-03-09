@@ -1,15 +1,17 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAdminTrackById, getAdminUnitById, getAdminLessonById, toggleActive, updateExercise } from "../services/adminLearningService";
+import { getAdminTrackById, getAdminUnitById, getAdminLessonById, toggleActive, updateExercise, deleteEntity } from "../services/adminLearningService";
 import { useAdminExercises } from "../hooks/useAdminExercises";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import AdminBreadcrumb from "../components/AdminBreadcrumb";
 import ExerciseEditor from "../components/ExerciseEditor";
-import { useState } from "react";
 import type { AdminExerciseRow } from "../services/adminLearningService";
 
 export default function LessonDetailPage() {
@@ -20,6 +22,7 @@ export default function LessonDetailPage() {
   }>();
   const qc = useQueryClient();
   const [editingExercise, setEditingExercise] = useState<AdminExerciseRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data: track } = useQuery({
     queryKey: ["admin", "track", trackId],
@@ -44,6 +47,13 @@ export default function LessonDetailPage() {
   const handleToggle = async (id: string, current: boolean) => {
     await toggleActive("learning_exercises", id, !current);
     qc.invalidateQueries({ queryKey: ["admin", "exercises"] });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteEntity("learning_exercises", deleteTarget);
+    qc.invalidateQueries({ queryKey: ["admin", "exercises"] });
+    setDeleteTarget(null);
   };
 
   const getQuestionPreview = (qd: any): string => {
@@ -97,6 +107,9 @@ export default function LessonDetailPage() {
                   <Button size="sm" variant="outline" onClick={() => setEditingExercise(ex)}>
                     Edit
                   </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(ex.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="py-2">
@@ -128,6 +141,23 @@ export default function LessonDetailPage() {
           }}
         />
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this exercise.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

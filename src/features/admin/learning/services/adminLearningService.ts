@@ -168,6 +168,16 @@ export async function getAdminLessonById(lessonId: string): Promise<AdminLessonR
   return data;
 }
 
+// ── Deletion ──
+
+export async function deleteEntity(
+  table: "learning_tracks" | "learning_sections" | "learning_units" | "learning_lessons" | "learning_exercises",
+  id: string,
+) {
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ── Mutations ──
 
 export async function toggleActive(

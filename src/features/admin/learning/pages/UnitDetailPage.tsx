@@ -1,16 +1,21 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAdminUnitById, getAdminTrackById, toggleActive } from "../services/adminLearningService";
+import { getAdminUnitById, getAdminTrackById, toggleActive, deleteEntity } from "../services/adminLearningService";
 import { useAdminLessons } from "../hooks/useAdminLessons";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import AdminBreadcrumb from "../components/AdminBreadcrumb";
 
 export default function UnitDetailPage() {
   const { trackId, unitId } = useParams<{ trackId: string; unitId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data: track } = useQuery({
     queryKey: ["admin", "track", trackId],
@@ -29,6 +34,13 @@ export default function UnitDetailPage() {
   const handleToggle = async (id: string, current: boolean) => {
     await toggleActive("learning_lessons", id, !current);
     qc.invalidateQueries({ queryKey: ["admin", "lessons"] });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteEntity("learning_lessons", deleteTarget);
+    qc.invalidateQueries({ queryKey: ["admin", "lessons"] });
+    setDeleteTarget(null);
   };
 
   return (
@@ -61,6 +73,7 @@ export default function UnitDetailPage() {
               <TableHead className="text-center">XP</TableHead>
               <TableHead className="text-center">Time</TableHead>
               <TableHead className="text-center">Active</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -80,11 +93,33 @@ export default function UnitDetailPage() {
                     onCheckedChange={() => handleToggle(l.id, l.is_active)}
                   />
                 </TableCell>
+                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(l.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this lesson and all its exercises.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

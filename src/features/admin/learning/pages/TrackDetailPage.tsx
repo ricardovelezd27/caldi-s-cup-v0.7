@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminTrackById } from "../services/adminLearningService";
+import { getAdminTrackById, toggleActive, deleteEntity } from "../services/adminLearningService";
 import { useAdminSections, useAdminUnitsForSections } from "../hooks/useAdminSections";
 import { Switch } from "@/components/ui/switch";
-import { toggleActive } from "../services/adminLearningService";
+import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Upload } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ChevronDown, Upload, Trash2 } from "lucide-react";
 import AdminBreadcrumb from "../components/AdminBreadcrumb";
 import ImportUnitModal from "../components/ImportUnitModal";
 
@@ -21,6 +21,7 @@ export default function TrackDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [importSection, setImportSection] = useState<{ sectionId: string; unitCount: number } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data: track } = useQuery({
     queryKey: ["admin", "track", trackId],
@@ -35,6 +36,13 @@ export default function TrackDetailPage() {
   const handleToggleUnit = async (id: string, current: boolean) => {
     await toggleActive("learning_units", id, !current);
     qc.invalidateQueries({ queryKey: ["admin", "units-by-sections"] });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteEntity("learning_units", deleteTarget);
+    qc.invalidateQueries({ queryKey: ["admin", "units-by-sections"] });
+    setDeleteTarget(null);
   };
 
   return (
@@ -98,6 +106,7 @@ export default function TrackDetailPage() {
                             <TableHead className="text-center">Lessons</TableHead>
                             <TableHead className="text-center">Time</TableHead>
                             <TableHead className="text-center">Active</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -116,6 +125,11 @@ export default function TrackDetailPage() {
                                   checked={u.is_active}
                                   onCheckedChange={() => handleToggleUnit(u.id, u.is_active)}
                                 />
+                              </TableCell>
+                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(u.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -138,6 +152,23 @@ export default function TrackDetailPage() {
           existingUnitCount={importSection.unitCount}
         />
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this unit and all its nested content (lessons and exercises).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
