@@ -1,81 +1,50 @@
 
 
-# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
+# Plan: LinkedIn-Style Desktop Profile with Cover
 
-## Root Cause
+## What Changes
 
-Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
+Remove the current 2-column desktop layout and make `ProfileHero` render on all screen sizes with responsive adaptations, creating a unified LinkedIn-style profile page.
 
-```typescript
-const allText = JSON.stringify(sanitizedData).toLowerCase();
+## Layout (LinkedIn-style)
+
+```text
+┌─────────────────────────────────────────────┐
+│           COVER IMAGE (250px tall)          │
+│                              [Edit Cover]   │
+├─────────────────────────────────────────────┤
+│  ┌──────┐                                   │
+│  │Avatar│  Name            [Edit ✏️]        │
+│  │(120px)│  email@example.com               │
+│  └──────┘  Rank Bar | 🔥 Streak | 🎯 Goal  │
+├─────────────────────────────────────────────┤
+│  Tribe Card  │  Profile Form  │ Password    │
+│              │                │ Retake Quiz  │
+├─────────────────────────────────────────────┤
+│     Favorites Table    │   Inventory Table   │
+├─────────────────────────────────────────────┤
+│              Feedback CTA                    │
+└─────────────────────────────────────────────┘
 ```
 
-When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
+## File Changes
 
-## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
+### 1. `ProfileHero.tsx`
+- Remove `md:hidden` — render on all viewports
+- Desktop: cover height `h-[200px] md:h-[250px]`, constrain content to `max-w-5xl mx-auto`
+- Desktop avatar: larger (w-32 h-32), positioned overlapping cover with negative margin
+- Name/email/rank/badges laid out horizontally on desktop, stacked on mobile
+- Edit cover button repositioned for desktop (bottom-right of cover)
 
-### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
+### 2. `ProfilePage.tsx`
+- Remove the `isMobile` conditional — always render `<ProfileHero />`
+- Remove the desktop-only left sidebar (avatar, rank, streak, tribe)
+- Remove the `<h1>` title (hero replaces it)
+- Below hero: single-column content area with tribe card, profile form, password, retake quiz
+- On desktop, tribe + form can sit side-by-side in a 2-col grid
+- Collections grid stays as-is (2-col on desktop)
+- Remove `useStreak`/`useDailyGoal` imports from ProfilePage (hero handles them)
 
-Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
-
-- `coffeeName`, `brand`
-- `variety`, `processingMethod`
-- `legacyRoastLevel` (text roast descriptor)
-- `originCountry`, `originRegion`, `originFarm`
-- `flavorNotes` (joined)
-
-**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
-
-```typescript
-// Build search text from ONLY the coffee's actual attributes
-const attributeText = [
-  sanitizedData.coffeeName,
-  sanitizedData.brand,
-  sanitizedData.variety,
-  sanitizedData.processingMethod,
-  sanitizedData.legacyRoastLevel,
-  sanitizedData.originCountry,
-  sanitizedData.originRegion,
-  sanitizedData.originFarm,
-  ...sanitizedData.flavorNotes,
-].filter(Boolean).join(" ").toLowerCase();
-```
-
-### 2. Strengthen the tribe context in the prompt (line 384-386)
-
-Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
-
-**Before:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-Consider these when calculating the tribe match score.
-```
-
-**After:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
-variety, processing method, roast level, origin, and flavor notes.
-Do NOT let references to other varietals or methods in jargon explanations
-influence the match assessment. For example, if the variety is "Caturra",
-do not count "Bourbon" as a match just because Caturra descends from Bourbon.
-```
-
-### 3. No model change
-
-Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
-
-## Impact
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
-| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
-| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
-
-Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
-
-## Implementation
-
-Single file edit with 2 changes, auto-deploys as edge function.
+### 3. `ProfileAvatar.tsx`
+- No changes needed — already supports `circle` variant with configurable size
 
