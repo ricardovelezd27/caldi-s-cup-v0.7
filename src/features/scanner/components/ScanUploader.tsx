@@ -192,7 +192,7 @@ export function ScanUploader({ onImagesReady, disabled }: ScanUploaderProps) {
   return (
     <>
       <div
-        className={`border-4 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`border-4 border-dashed rounded-lg p-4 sm:p-8 text-center transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={disabled ? undefined : handleDrop}
       >
         <input ref={fileInputRef} type="file" accept={ACCEPTED_TYPES.join(",")} onChange={handleFileChange} className="hidden" disabled={disabled} />
