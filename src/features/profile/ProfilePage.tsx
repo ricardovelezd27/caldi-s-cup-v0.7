@@ -8,10 +8,16 @@ import { ProfileAvatar, ProfileHero, ProfileInfoForm, ProfileRankRow, ChangePass
 import { Separator } from "@/components/ui/separator";
 import { FeedbackCTA } from "@/components/shared/FeedbackCTA";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { StreakDisplay } from "@/features/learning/components/gamification/StreakDisplay";
+import { DailyGoalRing } from "@/features/learning/components/gamification/DailyGoalRing";
+import { useStreak } from "@/hooks/gamification/useStreak";
+import { useDailyGoal } from "@/features/learning/hooks/useDailyGoal";
 
 function ProfileContent() {
   const { user, profile, refreshProfile } = useAuth();
   const { t } = useLanguage();
+  const { streak } = useStreak();
+  const { goal } = useDailyGoal();
 
   // Always fetch fresh profile data on mount to reflect XP earned elsewhere
   useEffect(() => {
@@ -40,6 +46,10 @@ function ProfileContent() {
                 email={user.email}
               />
               <ProfileRankRow />
+              <div className="flex items-center gap-3">
+                <StreakDisplay currentStreak={streak?.currentStreak ?? profile.current_streak ?? 0} size="sm" />
+                {goal && <DailyGoalRing earnedXp={goal.earnedXp} goalXp={goal.goalXp} size="sm" />}
+              </div>
               <div>
                 <h2 className="text-xl md:text-2xl mb-3">{t("profile.tribeHeading")}</h2>
                 <TribeSection tribe={profile.coffee_tribe} />

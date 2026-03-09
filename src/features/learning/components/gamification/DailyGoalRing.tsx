@@ -15,7 +15,6 @@ export function DailyGoalRing({ earnedXp, goalXp, size = "md", className }: Dail
     <div
       className={cn(
         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 border-border bg-card shadow-[2px_2px_0px_0px_hsl(var(--border))]",
-        achieved && "border-primary",
         className,
       )}
     >
