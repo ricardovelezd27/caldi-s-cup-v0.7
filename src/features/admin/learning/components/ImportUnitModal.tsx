@@ -29,6 +29,7 @@ export default function ImportUnitModal({ open, onClose, sectionId, existingUnit
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [overrideMode, setOverrideMode] = useState(false);
   const qc = useQueryClient();
 
   const handleParse = () => {
