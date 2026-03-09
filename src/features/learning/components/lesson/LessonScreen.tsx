@@ -224,6 +224,7 @@ export function LessonScreen({ lessonId, trackId, onExit, onComplete }: LessonSc
           timeSpent={lesson.timeSpent}
           onBackToTrack={handleLessonDone}
           isProcessing={isProcessingComplete}
+          isReview={isReview}
         />
         <SignupPrompt
           open={showSignup}
