@@ -1,81 +1,53 @@
 
 
-# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
+# Plan: Rank-Up Celebration Overlay
 
-## Root Cause
+## Overview
+Detect when a user's rank changes and display a full-screen celebratory overlay with mascot, rank icon, and animated effects. No framer-motion available — we'll use CSS animations (existing `animate-fade-in`, `animate-scale-in`, keyframes for bounce/pulse).
 
-Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
+## 1. Create `RankUpCelebration` Component
+**File**: `src/features/gamification/components/RankUpCelebration.tsx`
 
-```typescript
-const allText = JSON.stringify(sanitizedData).toLowerCase();
-```
+Full-screen fixed overlay (`z-[100]`) with:
+- Radial gradient background with subtle animated glow (CSS keyframe)
+- Floating emoji confetti (☕ ⭐ 🎉) using staggered CSS bounce animations (matching LessonComplete style)
+- `caldi-celebrating.png` mascot at large size
+- "RANK UP!" heading (`font-bangers`, large) + "You are now a {rankName}!" subtitle
+- Rank icon scaled up (`text-7xl`) with the rank's `colorClass`
+- "Continue" `<Button>` that calls `onDismiss`
 
-When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
+## 2. Create Rank Change Detection Hook
+**File**: `src/features/gamification/hooks/useRankUpDetection.ts`
 
-## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
+- Uses `getStorage()` from the existing `storageFactory` to persist `caldi_last_rank_id`
+- Compares `currentRank.id` from `useUserRank()` against stored value
+- On mismatch (and stored value exists — skip first load for new users): sets `rankUpTo` state to the new rank
+- Exposes `{ rankUpTo, dismissRankUp }` where dismiss updates storage and clears state
+- Storage key: `caldi_last_rank_id`
 
-### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
+## 3. Add Global Provider in App
+**File**: `src/features/gamification/components/RankUpProvider.tsx`
 
-Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+A thin wrapper component that:
+- Calls `useRankUpDetection()`
+- Renders `<RankUpCelebration>` conditionally when `rankUpTo` is set
+- Rendered once in `App.tsx` inside `<AuthProvider>`, after `<Sonner />`
 
-- `coffeeName`, `brand`
-- `variety`, `processingMethod`
-- `legacyRoastLevel` (text roast descriptor)
-- `originCountry`, `originRegion`, `originFarm`
-- `flavorNotes` (joined)
+## 4. Wire into App.tsx
+Add `<RankUpProvider />` inside `<AuthProvider>` block.
 
-**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
+## 5. Update Barrel Exports
+Update `src/features/gamification/index.ts` with new exports.
 
-```typescript
-// Build search text from ONLY the coffee's actual attributes
-const attributeText = [
-  sanitizedData.coffeeName,
-  sanitizedData.brand,
-  sanitizedData.variety,
-  sanitizedData.processingMethod,
-  sanitizedData.legacyRoastLevel,
-  sanitizedData.originCountry,
-  sanitizedData.originRegion,
-  sanitizedData.originFarm,
-  ...sanitizedData.flavorNotes,
-].filter(Boolean).join(" ").toLowerCase();
-```
+## Files
 
-### 2. Strengthen the tribe context in the prompt (line 384-386)
+| File | Action |
+|------|--------|
+| `src/features/gamification/components/RankUpCelebration.tsx` | **Create** |
+| `src/features/gamification/hooks/useRankUpDetection.ts` | **Create** |
+| `src/features/gamification/components/RankUpProvider.tsx` | **Create** |
+| `src/App.tsx` | Add `<RankUpProvider />` |
+| `src/features/gamification/index.ts` | Add exports |
 
-Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
-
-**Before:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-Consider these when calculating the tribe match score.
-```
-
-**After:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
-variety, processing method, roast level, origin, and flavor notes.
-Do NOT let references to other varietals or methods in jargon explanations
-influence the match assessment. For example, if the variety is "Caturra",
-do not count "Bourbon" as a match just because Caturra descends from Bourbon.
-```
-
-### 3. No model change
-
-Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
-
-## Impact
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
-| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
-| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
-
-Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
-
-## Implementation
-
-Single file edit with 2 changes, auto-deploys as edge function.
+No database changes.
 
