@@ -1311,7 +1311,6 @@ export type Database = {
         | "categorization"
         | "troubleshooting"
         | "recipe_building"
-        | "calculation"
         | "prediction"
         | "comparison"
       learning_level:
@@ -1478,7 +1477,6 @@ export const Constants = {
         "categorization",
         "troubleshooting",
         "recipe_building",
-        "calculation",
         "prediction",
         "comparison",
       ],
