@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/language";
 
 interface CoffeeImageProps {
   src: string | null;
@@ -10,6 +11,7 @@ interface CoffeeImageProps {
 }
 
 export function CoffeeImage({ src, alt, className, isTemporaryImage, additionalImages }: CoffeeImageProps) {
+  const { t } = useLanguage();
   const galleryImages = additionalImages && additionalImages.length > 0 ? additionalImages : null;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const mainSrc = galleryImages ? galleryImages[selectedIndex] : src;
