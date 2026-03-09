@@ -14,6 +14,7 @@ interface LessonCompleteProps {
   onNext?: () => void;
   onBackToTrack: () => void;
   isProcessing?: boolean;
+  isReview?: boolean;
 }
 
 export function LessonComplete({
