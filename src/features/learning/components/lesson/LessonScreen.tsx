@@ -240,7 +240,7 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
         <HeartsEmptyModal
           open={showHeartsEmpty}
           onOpenChange={setShowHeartsEmpty}
-          timeUntilNextHeart={null}
+          timeUntilRefill={timeUntilRefill}
         />
       </PageLayout>
     );
