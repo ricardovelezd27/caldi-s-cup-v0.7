@@ -1,81 +1,61 @@
 
 
-# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
+# Plan: Profile Page — Back on Brand + Widget Structure
 
-## Root Cause
+## Problem Summary
 
-Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
+1. **Stat cards are off-brand**: Missing the signature 4px solid border + 4px floating shadow. Using generic `border border-border` instead of the brand `border-[4px] border-border` + `boxShadow: "4px 4px 0px 0px hsl(var(--border))"`. Section headings missing `font-bangers tracking-wide`.
+2. **TribeSection is too small**: Needs to span full width below both stat sections and include a subtitle line (like "Your coffee personality").
+3. **Page structure needs widget-style sections**: Should follow dashboard pattern — Hero → Stats → Widgets (Tribe, FavoritesTable, InventoryTable as widget-style cards) → Account/Feedback/Footer.
 
-```typescript
-const allText = JSON.stringify(sanitizedData).toLowerCase();
+## Changes
+
+### 1. `ProfileStatCard.tsx` — Apply brand styling
+
+- Change container from `rounded-lg border border-border` to `rounded-md border-[4px] border-border` with inline `style={{ boxShadow: "4px 4px 0px 0px hsl(var(--border))" }}`
+- This instantly fixes all 5 stat cards (Streak, Goal, XP, Favorites, Inventory)
+
+### 2. `ProfilePage.tsx` — Restructure to widget layout
+
+Current: 12-col grid (Learning Hub 7 + Coffee Hub 5) → tables → account
+
+New structure:
+```text
+ProfileHero
+─────────────────────────────────
+Stats Row (all 5 cards in one row)
+  grid-cols-2 md:grid-cols-5
+  [Streak] [Goal] [XP] [Favs] [Inventory]
+─────────────────────────────────
+Widgets Section (full-width, dashboard-style cards)
+  grid-cols-1 md:grid-cols-2 (or 3)
+  [TribeSection - full width]
+  [FavoritesTable card] [InventoryTable card]
+─────────────────────────────────
+Account & Settings
+FeedbackCTA
 ```
 
-When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
+- Remove the split 7/5 column layout for stats — put all 5 in a single row matching the reference screenshot (Learning Hub label spans first 3, Coffee Hub label spans last 2)
+- Section headings use `font-bangers text-xl md:text-2xl tracking-wide`
+- TribeSection moves to full-width below stats
+- FavoritesTable and InventoryTable wrapped in brand-styled cards (4px border + shadow)
 
-## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
+### 3. `TribeSection.tsx` — Better space usage + subtitle
 
-### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
+- Add a subtitle line: tribe `title` rendered more prominently
+- When tribe exists, make the card span full width with the description text having more room
+- Match the `CoffeeTribeWidget` dashboard style: emoji in a circle, tribe values as tags, description text
 
-Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+### 4. Section headings — Brand typography
 
-- `coffeeName`, `brand`
-- `variety`, `processingMethod`
-- `legacyRoastLevel` (text roast descriptor)
-- `originCountry`, `originRegion`, `originFarm`
-- `flavorNotes` (joined)
+- All section `<h2>` elements get `font-bangers tracking-wide` class to match dashboard headings shown in reference images
 
-**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
+## Files Modified
 
-```typescript
-// Build search text from ONLY the coffee's actual attributes
-const attributeText = [
-  sanitizedData.coffeeName,
-  sanitizedData.brand,
-  sanitizedData.variety,
-  sanitizedData.processingMethod,
-  sanitizedData.legacyRoastLevel,
-  sanitizedData.originCountry,
-  sanitizedData.originRegion,
-  sanitizedData.originFarm,
-  ...sanitizedData.flavorNotes,
-].filter(Boolean).join(" ").toLowerCase();
-```
-
-### 2. Strengthen the tribe context in the prompt (line 384-386)
-
-Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
-
-**Before:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-Consider these when calculating the tribe match score.
-```
-
-**After:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
-variety, processing method, roast level, origin, and flavor notes.
-Do NOT let references to other varietals or methods in jargon explanations
-influence the match assessment. For example, if the variety is "Caturra",
-do not count "Bourbon" as a match just because Caturra descends from Bourbon.
-```
-
-### 3. No model change
-
-Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
-
-## Impact
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
-| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
-| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
-
-Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
-
-## Implementation
-
-Single file edit with 2 changes, auto-deploys as edge function.
+| File | Change |
+|------|--------|
+| `ProfileStatCard.tsx` | Brand border + shadow styling |
+| `ProfilePage.tsx` | Restructure: single stats row → widgets section → account |
+| `TribeSection.tsx` | Full-width, subtitle, better space usage |
 
