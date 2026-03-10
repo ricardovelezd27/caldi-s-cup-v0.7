@@ -212,6 +212,7 @@ export function LessonScreen({ lessonId, trackId, trackRoute, onExit, onComplete
           onExit={onExit}
           hearts={user ? hearts : undefined}
           maxHearts={user ? maxHearts : undefined}
+          timeUntilRefill={user ? timeUntilRefill : undefined}
         />
         <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col px-4 pb-8">
           <ExerciseRenderer
