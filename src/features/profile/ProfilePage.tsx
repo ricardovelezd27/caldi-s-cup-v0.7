@@ -53,7 +53,7 @@ function ProfileContent() {
         <div className="grid grid-cols-12 gap-8">
           {/* 🎓 Learning Journey */}
           <section className="col-span-12 md:col-span-7">
-            <h2 className="text-xl md:text-2xl mb-4">🎓 {t("profile.tribeHeading") || "Learning Journey"}</h2>
+            <h2 className="text-xl md:text-2xl mb-4">🎓 Learning Hub</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <ProfileStreakCard />
               <ProfileDailyGoalCard />
