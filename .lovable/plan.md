@@ -1,81 +1,54 @@
 
 
-# Fix: Scanner Tribe Match Hallucination (Prompt + Matching Logic)
+# Plan: Hearts System Overhaul — Full 24h Refill, Lesson Termination, Modal Redesign
 
-## Root Cause
+## Step 1: Fix Replenishment Logic (`useHearts.ts`)
 
-Line 551 serializes the **entire** `sanitizedData` object (including `jargonExplanations` and `brandStory`) into one string for keyword matching:
+**Current behavior**: Hearts refill one-by-one every 24h based on elapsed time math.
 
-```typescript
-const allText = JSON.stringify(sanitizedData).toLowerCase();
-```
+**New behavior**: All 5 hearts refill simultaneously, exactly 24 hours after the first heart was lost. The `hearts_last_refilled_at` column is repurposed as "first heart lost at" timestamp.
 
-When the AI explains *"Caturra is a natural mutation of **Bourbon**"* in jargon, the Owl tribe keywords "Bourbon" and "Typica" match against that educational text -- not the coffee's actual variety (Caturra). This inflates the score from ~30% to ~80%.
+Changes:
+- Keep `REFILL_INTERVAL_MS = 24h`
+- Add a `useState(Date.now())` that ticks every second via `useEffect` to drive reactive countdown
+- In `computed` memo: if `raw.hearts < raw.max_hearts` and 24h has elapsed since `hearts_last_refilled_at`, treat hearts as fully refilled (max). Otherwise use `raw.hearts` as-is
+- Compute `timeUntilRefill` in ms (or null if hearts are full)
+- In `loseHeartMutation`: only set `hearts_last_refilled_at` to now when going from max→below-max (first loss). Subsequent losses don't update the timestamp
+- Export `timeUntilRefill` (ms) instead of the old `timeUntilNextHeart`
 
-## Changes (single file: `supabase/functions/scan-coffee/index.ts`)
+## Step 2: Add Timer to `HeartsDisplay.tsx`
 
-### 1. Fix keyword matching to search only coffee attributes (lines 550-568)
+- Add optional `timeUntilRefill?: number | null` prop
+- When present and hearts < max, render a small formatted `HH:MM:SS` countdown below/beside the hearts row
+- Format helper inline: hours:minutes:seconds
 
-Replace `JSON.stringify(sanitizedData)` with a targeted string built from only the coffee's own identifying attributes:
+## Step 3: Pass Timer Through `LessonProgress.tsx`
 
-- `coffeeName`, `brand`
-- `variety`, `processingMethod`
-- `legacyRoastLevel` (text roast descriptor)
-- `originCountry`, `originRegion`, `originFarm`
-- `flavorNotes` (joined)
+- Add `timeUntilRefill?: number | null` prop, pass it down to `HeartsDisplay`
 
-**Excluded** from matching: `jargonExplanations`, `brandStory`, `awards`, numeric scores.
+## Step 4: Enforce Lesson Termination (`LessonScreen.tsx`)
 
-```typescript
-// Build search text from ONLY the coffee's actual attributes
-const attributeText = [
-  sanitizedData.coffeeName,
-  sanitizedData.brand,
-  sanitizedData.variety,
-  sanitizedData.processingMethod,
-  sanitizedData.legacyRoastLevel,
-  sanitizedData.originCountry,
-  sanitizedData.originRegion,
-  sanitizedData.originFarm,
-  ...sanitizedData.flavorNotes,
-].filter(Boolean).join(" ").toLowerCase();
-```
+- Destructure `timeUntilRefill` from `useHearts()`
+- Pass `timeUntilRefill` to `LessonProgress` and `HeartsEmptyModal`
+- In the FeedbackModal's `onContinue`: wrap `lesson.nextExercise` — if `hearts === 0 && user`, show `HeartsEmptyModal` instead of advancing
+- The `ExerciseRenderer` is already `disabled` when `!hasHearts && !!user`, keeping that
 
-### 2. Strengthen the tribe context in the prompt (line 384-386)
+## Step 5: Redesign `HeartsEmptyModal.tsx`
 
-Update the tribe context instruction to tell the AI to assess the match based strictly on the coffee's own extracted attributes, not on educational/descriptive text:
+- Make non-dismissible: `onOpenChange` does nothing, prevent `onPointerDownOutside` and `onEscapeKeyDown`, hide the X close button
+- Show live countdown: "All 5 hearts will replenish in HH:MM:SS"
+- Three buttons using `useNavigate()`:
+  1. **"Go to Learn Home"** — primary styled button → `/learn`
+  2. **"Go to Profile"** — outline button → `/profile`
+  3. **"Purchase Hearts"** — disabled button with "Coming Soon" badge, shows toast via `sonner`
 
-**Before:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-Consider these when calculating the tribe match score.
-```
+## Files Changed
 
-**After:**
-```
-The user's Coffee Tribe is "${userTribe}" with preference keywords: ${tribeKeywords.join(", ")}.
-IMPORTANT: When assessing tribe alignment, evaluate ONLY based on this coffee's own
-variety, processing method, roast level, origin, and flavor notes.
-Do NOT let references to other varietals or methods in jargon explanations
-influence the match assessment. For example, if the variety is "Caturra",
-do not count "Bourbon" as a match just because Caturra descends from Bourbon.
-```
-
-### 3. No model change
-
-Keep `google/gemini-2.5-flash` as-is. The hallucination is caused by the matching logic, not the model's extraction accuracy.
-
-## Impact
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Caturra coffee, Owl tribe | ~80% (false Bourbon/Typica match from jargon) | ~30-50% (correct: no direct Owl keywords in attributes) |
-| Actual Bourbon coffee, Owl tribe | ~80% | ~80% (correct: Bourbon is in variety field) |
-| Natural process coffee, Hummingbird | ~65% | ~65% (unchanged: "Natural" is in processingMethod) |
-
-Works across all 4 tribes since the fix is in the generic matching logic, not tribe-specific code.
-
-## Implementation
-
-Single file edit with 2 changes, auto-deploys as edge function.
+| File | Change |
+|------|--------|
+| `useHearts.ts` | Full refill logic, reactive tick, export `timeUntilRefill` |
+| `HeartsDisplay.tsx` | Accept + render countdown timer |
+| `LessonProgress.tsx` | Pass `timeUntilRefill` to `HeartsDisplay` |
+| `LessonScreen.tsx` | Block continue at 0 hearts, pass timer props |
+| `HeartsEmptyModal.tsx` | Non-dismissible, 3 buttons, live countdown |
 
