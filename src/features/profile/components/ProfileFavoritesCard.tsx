@@ -10,7 +10,7 @@ export function ProfileFavoritesCard() {
       icon={<Heart className="h-5 w-5" />}
       iconClassName="bg-rose-100 text-rose-600"
       metric={favoriteIds.length}
-      label="Favorites"
+      label="Favorite coffees"
     />
   );
 }

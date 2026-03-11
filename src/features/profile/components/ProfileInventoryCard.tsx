@@ -10,7 +10,7 @@ export function ProfileInventoryCard() {
       icon={<Package className="h-5 w-5" />}
       iconClassName="bg-amber-100 text-amber-700"
       metric={inventoryItems.length}
-      label="In Inventory"
+      label="Coffees in Inventory"
     />
   );
 }
